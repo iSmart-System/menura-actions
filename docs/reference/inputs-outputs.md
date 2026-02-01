@@ -16,6 +16,7 @@ Referência completa de todos os inputs e outputs dos workflows disponíveis.
 | `skip-tests` | boolean | `false` | Pular etapa de testes |
 | `skip-build` | boolean | `false` | Pular etapa de build |
 | `artifact-path` | string | `'dist'` | Caminho dos artefatos de build |
+| `upload-artifacts` | boolean | `true` | Fazer upload dos artefatos de build |
 
 **Outputs:** Nenhum
 
@@ -31,6 +32,7 @@ Referência completa de todos os inputs e outputs dos workflows disponíveis.
 | `skip-tests` | boolean | `false` | Pular etapa de testes |
 | `skip-build` | boolean | `false` | Pular etapa de build |
 | `artifact-path` | string | `'dist'` | Caminho dos artefatos de build |
+| `upload-artifacts` | boolean | `true` | Fazer upload dos artefatos de build |
 
 **Outputs:** Nenhum
 
@@ -132,6 +134,7 @@ Inputs que aparecem em múltiplos workflows:
 | `node-version` | CI Node, Release | Versão do Node.js |
 | `working-directory` | CI Node, CI Bun, Release | Diretório de trabalho |
 | `artifact-path` | CI Node, CI Bun, Release | Caminho dos artefatos |
+| `upload-artifacts` | CI Node, CI Bun | Controlar upload de artefatos de build |
 
 ---
 
@@ -161,6 +164,7 @@ jobs:
       working-directory: 'packages/api'
       artifact-path: 'build'
       skip-tests: false
+      upload-artifacts: false  # Desabilitar upload em PRs
     secrets: inherit
 ```
 

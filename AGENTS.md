@@ -211,8 +211,8 @@ v1.0.0       → Release de Produção (após merge em main)
 
 | Workflow | Propósito |
 |----------|-----------|
-| `codebase-ci-node.yml` | Pipeline de CI para projetos Node.js (lint, tests, build) |
-| `codebase-ci-bun.yml` | Pipeline de CI para projetos Bun (lint, tests, build) |
+| `codebase-ci-node.yml` | Pipeline de CI para projetos Node.js (lint, tests, build). Suporta `upload-artifacts` para controlar upload de artefatos. |
+| `codebase-ci-bun.yml` | Pipeline de CI para projetos Bun (lint, tests, build). Suporta `upload-artifacts` para controlar upload de artefatos. |
 | `codebase-release-node.yml` | Gera artefatos .zip e publica no GitHub Releases (Node.js) |
 | `codebase-release-bun.yml` | Gera artefatos .zip e publica no GitHub Releases (Bun) |
 | `codebase-create-rc.yml` | Cria tag de Release Candidate |
@@ -299,6 +299,14 @@ docs(readme): melhorar seção de instalação
 2. Atualizar header do workflow com documentação
 3. Atualizar exemplos em `examples/`
 4. Atualizar `docs/reference/` correspondente
+
+**Exemplo:** O input `upload-artifacts` foi adicionado aos workflows CI para permitir que projetos desabilitem o upload de artefatos em PRs:
+
+```yaml
+# No projeto que consome o workflow
+with:
+  upload-artifacts: false  # Desabilita upload em PRs
+```
 
 ### Testar Mudança em Projeto Real
 

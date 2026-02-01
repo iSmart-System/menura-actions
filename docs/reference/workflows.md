@@ -22,6 +22,7 @@ Documentação técnica de todos os workflows disponíveis no menura-actions par
 | `skip-tests` | boolean | não | `false` | Pular etapa de testes |
 | `skip-build` | boolean | não | `false` | Pular etapa de build |
 | `artifact-path` | string | não | `'dist'` | Caminho dos artefatos de build |
+| `upload-artifacts` | boolean | não | `true` | Fazer upload dos artefatos |
 
 ### Jobs
 
@@ -66,6 +67,7 @@ jobs:
 | `skip-tests` | boolean | não | `false` | Pular etapa de testes |
 | `skip-build` | boolean | não | `false` | Pular etapa de build |
 | `artifact-path` | string | não | `'dist'` | Caminho dos artefatos de build |
+| `upload-artifacts` | boolean | não | `true` | Fazer upload dos artefatos |
 
 ### Jobs
 

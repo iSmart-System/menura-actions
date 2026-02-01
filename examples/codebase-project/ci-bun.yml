@@ -22,4 +22,5 @@ jobs:
       # skip-lint: false
       # skip-tests: false
       # skip-build: false
+      # upload-artifacts: true  # false para desabilitar upload em PRs
     secrets: inherit

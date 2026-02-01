@@ -40,6 +40,11 @@ on:
         required: false
         type: string
         default: 'dist'
+      upload-artifacts:
+        description: 'Fazer upload dos artefatos de build'
+        required: false
+        type: boolean
+        default: true
 
 jobs:
   ci:
@@ -76,7 +81,7 @@ jobs:
         run: npm run build --if-present
 
       - name: Upload artefatos de build
-        if: ${{ !inputs.skip-build }}
+        if: ${{ !inputs.skip-build && inputs.upload-artifacts }}
         uses: actions/upload-artifact@v4
         with:
           name: build-artifacts

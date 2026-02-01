@@ -106,6 +106,7 @@ jobs:
     with:
       node-version: '20'
       artifact-path: 'dist'  # Caminho do build
+      # upload-artifacts: false  # Opcional: desabilitar upload em PRs
     secrets: inherit
 ```
 
@@ -123,6 +124,7 @@ jobs:
     with:
       bun-version: 'latest'
       artifact-path: 'dist'  # Caminho do build
+      # upload-artifacts: false  # Opcional: desabilitar upload em PRs
     secrets: inherit
 ```
 

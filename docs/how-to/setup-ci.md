@@ -143,6 +143,15 @@ with:
   skip-build: false
 ```
 
+### Controlar upload de artefatos
+
+Por padrão, artefatos de build são enviados para o GitHub Actions (útil para validação, testes E2E, etc). Para desabilitar o upload (ex: em PRs):
+
+```yaml
+with:
+  upload-artifacts: false  # Desabilita upload de artefatos
+```
+
 ### Monorepo (subdiretório)
 
 ```yaml
