@@ -89,6 +89,7 @@ flowchart LR
 | [`codebase-create-rc.yml`](.github/workflows/codebase-create-rc.yml) | Cria tag de Release Candidate | Manual |
 | [`codebase-qualify-rc.yml`](.github/workflows/codebase-qualify-rc.yml) | Qualifica RC como release de produção | Manual |
 | [`codebase-validate-tag.yml`](.github/workflows/codebase-validate-tag.yml) | Valida nomenclatura de tags | Push de tags |
+| [`codebase-preview-deploy.yml`](.github/workflows/codebase-preview-deploy.yml) | Preview deploy manual de PRs em sandbox | Manual (PRs) |
 
 ### Como Usar
 
@@ -157,6 +158,39 @@ jobs:
       artifact-path: 'dist'
     secrets: inherit
 ```
+
+### Preview Deploy em PRs (Opcional)
+
+Para habilitar preview deploy manual de PRs no ambiente sandbox:
+
+```yaml
+# .github/workflows/ci.yml
+on:
+  pull_request:
+    branches: [sandbox, main]
+
+jobs:
+  ci:
+    uses: iSmart-System/menura-actions/.github/workflows/codebase-ci-node.yml@main
+    with:
+      node-version: '20'
+      artifact-path: 'dist'
+    secrets: inherit
+
+  preview-deploy:
+    if: github.event_name == 'pull_request'
+    needs: ci
+    uses: iSmart-System/menura-actions/.github/workflows/codebase-preview-deploy.yml@main
+    with:
+      artifact-name: 'meu-app'
+      pr-number: ${{ github.event.pull_request.number }}
+      repository-name: 'meu-app'
+      branch-name: ${{ github.head_ref }}
+    secrets:
+      dispatch-token: ${{ secrets.PREVIEW_DEPLOY_TOKEN }}
+```
+
+> **Requisitos:** Environment `sandbox-preview` com required reviewers + Secret `PREVIEW_DEPLOY_TOKEN`
 
 ---
 

@@ -86,17 +86,60 @@ Configure `GH_TOKEN` APENAS se precisar:
 
 ---
 
+### PREVIEW_DEPLOY_TOKEN (Opcional)
+
+**Tipo:** Personal Access Token (PAT)
+**Configuração necessária:** Manual (apenas para preview deploy)
+**Disponível via:** `secrets.PREVIEW_DEPLOY_TOKEN`
+
+#### Quando usar
+
+Configure `PREVIEW_DEPLOY_TOKEN` APENAS se você quer habilitar **preview deploy manual de PRs**:
+
+- Permite que desenvolvedores façam deploy de preview de um PR no ambiente sandbox antes do merge
+- Dispara deploy automático no repositório `menura-cloud-foundation`
+- Requer aprovação manual via GitHub Environment
+
+#### Como criar
+
+1. GitHub Settings (perfil) → Developer settings
+2. Personal access tokens → Fine-grained tokens
+3. Generate new token
+4. Configure:
+   - **Token name:** `preview-deploy-token`
+   - **Expiration:** 1 year (ou conforme política)
+   - **Repository access:** Only select repositories
+   - Selecione: `iSmart-System/menura-cloud-foundation`
+   - **Permissions:**
+     - Contents: Read and write
+     - Metadata: Read-only
+5. Copie o token
+6. Adicione como secret `PREVIEW_DEPLOY_TOKEN` no repositório
+
+#### Uso
+
+```yaml
+jobs:
+  preview-deploy:
+    uses: iSmart-System/menura-actions/.github/workflows/codebase-preview-deploy.yml@main
+    secrets:
+      dispatch-token: ${{ secrets.PREVIEW_DEPLOY_TOKEN }}
+```
+
+---
+
 ## Comparação
 
-| Aspecto | GITHUB_TOKEN | GH_TOKEN |
-|---------|--------------|----------|
-| **Configuração** | Automático | Manual |
-| **Criar releases** | ✅ Sim | ✅ Sim |
-| **Upload artefatos** | ✅ Sim | ✅ Sim |
-| **Criar tags** | ✅ Sim | ✅ Sim |
-| **PRs disparam workflows** | ❌ Não | ✅ Sim |
-| **Acesso outros repos** | ❌ Não | ✅ Sim |
-| **Recomendado para** | Maioria dos casos | Casos específicos |
+| Aspecto | GITHUB_TOKEN | GH_TOKEN | PREVIEW_DEPLOY_TOKEN |
+|---------|--------------|----------|----------------------|
+| **Configuração** | Automático | Manual | Manual |
+| **Criar releases** | ✅ Sim | ✅ Sim | ❌ Não |
+| **Upload artefatos** | ✅ Sim | ✅ Sim | ❌ Não |
+| **Criar tags** | ✅ Sim | ✅ Sim | ❌ Não |
+| **PRs disparam workflows** | ❌ Não | ✅ Sim | ❌ Não |
+| **Acesso outros repos** | ❌ Não | ✅ Sim | ✅ Sim (foundation) |
+| **Preview deploy** | ❌ Não | ❌ Não | ✅ Sim |
+| **Recomendado para** | Maioria dos casos | Casos específicos | Preview deploy |
 
 ---
 

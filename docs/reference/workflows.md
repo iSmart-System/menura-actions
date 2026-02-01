@@ -306,14 +306,101 @@ jobs:
 
 ---
 
+## codebase-preview-deploy.yml
+
+**Propósito:** Dispara preview deploy manual de PRs no ambiente sandbox.
+
+**Arquivo:** `.github/workflows/codebase-preview-deploy.yml`
+
+**Trigger:** `workflow_call` (chamado por workflows de CI em PRs)
+
+### Inputs
+
+| Input | Tipo | Obrigatório | Default | Descrição |
+|-------|------|-------------|---------|-----------|
+| `artifact-name` | string | **sim** | - | Nome do artefato gerado (sem extensão) |
+| `pr-number` | string | **sim** | - | Número do Pull Request |
+| `repository-name` | string | **sim** | - | Nome do repositório para identificação |
+| `branch-name` | string | **sim** | - | Nome da branch |
+| `environment` | string | não | `'sandbox-preview'` | Nome do environment GitHub para aprovação |
+| `foundation-repo` | string | não | `'iSmart-System/menura-cloud-foundation'` | Repositório de infraestrutura |
+
+### Secrets
+
+| Secret | Obrigatório | Descrição |
+|--------|-------------|-----------|
+| `dispatch-token` | **sim** | PAT com acesso ao repositório de infraestrutura |
+
+### Jobs
+
+1. **trigger-preview-deploy** - Dispara deploy no repositório de infraestrutura
+   - Valida inputs
+   - Prepara metadata (artifact name efêmero, preview ID)
+   - Envia `repository_dispatch` event para `menura-cloud-foundation`
+   - Comenta no PR com detalhes do deploy
+   - Requer aprovação manual via GitHub Environment
+
+### Payload Enviado
+
+```json
+{
+  "event_type": "preview-deploy",
+  "client_payload": {
+    "source_repo": "owner/repo",
+    "source_repo_name": "app-name",
+    "pr_number": "123",
+    "branch": "feat/branch",
+    "commit_sha": "abc123...",
+    "artifact_name": "app-pr-123",
+    "artifact_url": "https://...",
+    "preview_id": "pr-123",
+    "environment": "sandbox",
+    "triggered_by": "username"
+  }
+}
+```
+
+### Exemplo de Uso
+
+```yaml
+jobs:
+  ci:
+    uses: iSmart-System/menura-actions/.github/workflows/codebase-ci-node.yml@main
+    with:
+      artifact-path: 'dist'
+    secrets: inherit
+
+  preview-deploy:
+    if: github.event_name == 'pull_request'
+    needs: ci
+    uses: iSmart-System/menura-actions/.github/workflows/codebase-preview-deploy.yml@main
+    with:
+      artifact-name: 'meu-app'
+      pr-number: ${{ github.event.pull_request.number }}
+      repository-name: 'meu-app'
+      branch-name: ${{ github.head_ref }}
+    secrets:
+      dispatch-token: ${{ secrets.PREVIEW_DEPLOY_TOKEN }}
+```
+
+### Requisitos
+
+- GitHub Environment `sandbox-preview` configurado com required reviewers
+- PAT com scope `repo` e write access ao `menura-cloud-foundation`
+- Secret `PREVIEW_DEPLOY_TOKEN` configurado no repositório
+- Workflow no `menura-cloud-foundation` escutando evento `preview-deploy`
+
+---
+
 # Matriz de Compatibilidade
 
-| Workflow | Branch sandbox | Branch main | Tag RC | Tag Prod |
-|----------|---------------|-------------|--------|----------|
-| codebase-ci-node.yml | ✅ | ✅ | - | - |
-| codebase-ci-bun.yml | ✅ | ✅ | - | - |
-| codebase-release-node.yml | - | - | ✅ | ✅ |
-| codebase-release-bun.yml | - | - | ✅ | ✅ |
-| codebase-create-rc.yml | ✅ | ❌ | - | - |
-| codebase-qualify-rc.yml | - | - | ✅ | - |
-| codebase-validate-tag.yml | - | - | ✅ | ✅ |
+| Workflow | Branch sandbox | Branch main | Tag RC | Tag Prod | PR |
+|----------|---------------|-------------|--------|----------|-----|
+| codebase-ci-node.yml | ✅ | ✅ | - | - | ✅ |
+| codebase-ci-bun.yml | ✅ | ✅ | - | - | ✅ |
+| codebase-release-node.yml | - | - | ✅ | ✅ | - |
+| codebase-release-bun.yml | - | - | ✅ | ✅ | - |
+| codebase-create-rc.yml | ✅ | ❌ | - | - | - |
+| codebase-qualify-rc.yml | - | - | ✅ | - | - |
+| codebase-validate-tag.yml | - | - | ✅ | ✅ | - |
+| codebase-preview-deploy.yml | - | - | - | - | ✅ |

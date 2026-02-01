@@ -13,6 +13,7 @@
 |------|-----------|
 | [Configurar CI](setup-ci.md) | Configure CI em um novo projeto |
 | [Configurar Secrets](configure-secrets.md) | Configure secrets necessários |
+| [Preview Deploy em PRs](preview-deploy.md) | Configure preview deploy manual de PRs |
 
 ### Release
 

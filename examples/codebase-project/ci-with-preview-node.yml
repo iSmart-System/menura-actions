@@ -1,0 +1,42 @@
+# =============================================================================
+# Exemplo: CI com Preview Deploy para projeto Node.js
+# =============================================================================
+# Este exemplo mostra como integrar CI com preview deploy opcional.
+# Copie este arquivo para .github/workflows/ci.yml no seu projeto
+# =============================================================================
+
+name: CI
+
+on:
+  pull_request:
+    branches: [sandbox, main]
+  push:
+    branches: [sandbox, main]
+
+jobs:
+  # Job principal de CI (sempre executa)
+  ci:
+    uses: iSmart-System/menura-actions/.github/workflows/codebase-ci-node.yml@main
+    with:
+      node-version: '20'
+      artifact-path: 'dist'
+      # upload-artifacts: true  # Manter true para permitir preview deploy
+    secrets: inherit
+
+  # Job de Preview Deploy (manual, apenas para PRs)
+  preview-deploy:
+    name: Preview Deploy (Manual)
+    if: github.event_name == 'pull_request'
+    needs: ci
+    uses: iSmart-System/menura-actions/.github/workflows/codebase-preview-deploy.yml@main
+    with:
+      artifact-name: 'meu-app'  # Nome do seu projeto
+      pr-number: ${{ github.event.pull_request.number }}
+      repository-name: 'meu-app'  # Nome para identificar no foundation
+      branch-name: ${{ github.head_ref }}
+    secrets:
+      dispatch-token: ${{ secrets.PREVIEW_DEPLOY_TOKEN }}
+
+    # IMPORTANTE: Configure o Environment "sandbox-preview" no GitHub
+    # Settings > Environments > New environment > "sandbox-preview"
+    # Adicione required reviewers para aprovação manual

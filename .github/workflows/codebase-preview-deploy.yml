@@ -1,0 +1,157 @@
+# =============================================================================
+# Preview Deploy to Sandbox (Reusable Workflow)
+# =============================================================================
+# Este workflow permite deploy manual de preview de um PR no ambiente sandbox.
+# Dispara o repositório menura-cloud-foundation para fazer deploy efêmero.
+# =============================================================================
+
+name: Preview Deploy to Sandbox
+
+on:
+  workflow_call:
+    inputs:
+      artifact-name:
+        description: 'Nome do artefato gerado (sem extensão)'
+        required: true
+        type: string
+      pr-number:
+        description: 'Número do Pull Request'
+        required: true
+        type: string
+      repository-name:
+        description: 'Nome do repositório (ex: my-app)'
+        required: true
+        type: string
+      branch-name:
+        description: 'Nome da branch'
+        required: true
+        type: string
+      environment:
+        description: 'Nome do environment GitHub para aprovação'
+        required: false
+        type: string
+        default: 'sandbox-preview'
+      foundation-repo:
+        description: 'Repositório de infraestrutura (owner/repo)'
+        required: false
+        type: string
+        default: 'iSmart-System/menura-cloud-foundation'
+    secrets:
+      dispatch-token:
+        description: 'PAT com acesso ao repositório de infraestrutura'
+        required: true
+
+jobs:
+  trigger-preview-deploy:
+    name: Trigger Preview Deploy
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+
+    steps:
+      - name: Validar inputs
+        run: |
+          echo "🔍 Validando inputs..."
+
+          if [[ -z "${{ inputs.artifact-name }}" ]]; then
+            echo "::error::artifact-name não pode ser vazio"
+            exit 1
+          fi
+
+          if [[ ! "${{ inputs.pr-number }}" =~ ^[0-9]+$ ]]; then
+            echo "::error::pr-number deve ser numérico"
+            exit 1
+          fi
+
+          echo "✅ Inputs válidos"
+
+      - name: Preparar metadata
+        id: metadata
+        run: |
+          # Cria nome único para o artefato efêmero
+          EPHEMERAL_ARTIFACT="${{ inputs.artifact-name }}-pr-${{ inputs.pr-number }}"
+
+          # Cria identificador único para o preview environment
+          PREVIEW_ID="pr-${{ inputs.pr-number }}"
+
+          # URL do artefato no GitHub Actions
+          ARTIFACT_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+          echo "ephemeral-artifact=$EPHEMERAL_ARTIFACT" >> $GITHUB_OUTPUT
+          echo "preview-id=$PREVIEW_ID" >> $GITHUB_OUTPUT
+          echo "artifact-url=$ARTIFACT_URL" >> $GITHUB_OUTPUT
+
+          echo "📦 Artefato efêmero: $EPHEMERAL_ARTIFACT"
+          echo "🔗 Preview ID: $PREVIEW_ID"
+
+      - name: Trigger Infrastructure Deploy
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.dispatch-token }}
+          repository: ${{ inputs.foundation-repo }}
+          event-type: preview-deploy
+          client-payload: |
+            {
+              "source_repo": "${{ github.repository }}",
+              "source_repo_name": "${{ inputs.repository-name }}",
+              "pr_number": "${{ inputs.pr-number }}",
+              "branch": "${{ inputs.branch-name }}",
+              "commit_sha": "${{ github.sha }}",
+              "artifact_name": "${{ steps.metadata.outputs.ephemeral-artifact }}",
+              "artifact_url": "${{ steps.metadata.outputs.artifact-url }}",
+              "preview_id": "${{ steps.metadata.outputs.preview-id }}",
+              "environment": "sandbox",
+              "triggered_by": "${{ github.actor }}"
+            }
+
+      - name: Comentar no PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prNumber = ${{ inputs.pr-number }};
+            const previewId = '${{ steps.metadata.outputs.preview-id }}';
+            const artifactName = '${{ steps.metadata.outputs.ephemeral-artifact }}';
+
+            const comment = `## 🚀 Preview Deploy Solicitado
+
+            Um deploy de preview foi disparado para o ambiente sandbox.
+
+            ### Detalhes
+            - **Preview ID:** \`${previewId}\`
+            - **Artefato:** \`${artifactName}\`
+            - **Branch:** \`${{ inputs.branch-name }}\`
+            - **Commit:** \`${{ github.sha }}\`
+            - **Solicitado por:** @${{ github.actor }}
+
+            ### Próximos Passos
+            1. Aguarde o deploy no repositório [menura-cloud-foundation](https://github.com/${{ inputs.foundation-repo }})
+            2. Acesse o ambiente preview quando estiver pronto
+            3. Teste as mudanças
+            4. O preview será removido automaticamente quando o PR for fechado
+
+            ---
+
+            🔗 [Ver workflow de deploy](https://github.com/${{ inputs.foundation-repo }}/actions)
+            `;
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              body: comment
+            });
+
+      - name: Resumo
+        run: |
+          echo "## 🚀 Preview Deploy Disparado" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Informações do Deploy" >> $GITHUB_STEP_SUMMARY
+          echo "- **Repositório Alvo:** \`${{ inputs.foundation-repo }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Preview ID:** \`${{ steps.metadata.outputs.preview-id }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Artefato:** \`${{ steps.metadata.outputs.ephemeral-artifact }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **PR:** #${{ inputs.pr-number }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch:** \`${{ inputs.branch-name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Status" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Evento \`preview-deploy\` enviado para o repositório de infraestrutura" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "O deploy será executado no repositório [menura-cloud-foundation](https://github.com/${{ inputs.foundation-repo }}/actions)" >> $GITHUB_STEP_SUMMARY

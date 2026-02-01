@@ -34,6 +34,7 @@ docs/
 | [Configurar CI](how-to/setup-ci.md) | Configure CI em um novo projeto |
 | [Criar Release Candidate](how-to/create-rc.md) | Crie uma nova RC para validação |
 | [Qualificar RC](how-to/qualify-rc.md) | Qualifique uma RC validada |
+| [Preview Deploy em PRs](how-to/preview-deploy.md) | Configure preview deploy manual de PRs |
 | [Configurar Secrets](how-to/configure-secrets.md) | Configure secrets necessários |
 
 ### 📖 Reference (Consulta)

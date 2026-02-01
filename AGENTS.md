@@ -218,6 +218,7 @@ v1.0.0       → Release de Produção (após merge em main)
 | `codebase-create-rc.yml` | Cria tag de Release Candidate |
 | `codebase-qualify-rc.yml` | Qualifica RC como release de produção |
 | `codebase-validate-tag.yml` | Valida nomenclatura de tags |
+| `codebase-preview-deploy.yml` | Preview deploy manual de PRs em sandbox via repository dispatch |
 
 ## Development Environment
 
@@ -306,6 +307,36 @@ docs(readme): melhorar seção de instalação
 # No projeto que consome o workflow
 with:
   upload-artifacts: false  # Desabilita upload em PRs
+```
+
+### Adicionar Preview Deploy a um Projeto
+
+Para habilitar preview deploy manual de PRs:
+
+1. Configurar GitHub Environment `sandbox-preview` com required reviewers
+2. Criar PAT com acesso ao repositório `menura-cloud-foundation`
+3. Adicionar secret `PREVIEW_DEPLOY_TOKEN` no repositório
+4. Adicionar job de preview deploy ao workflow de CI:
+
+```yaml
+jobs:
+  ci:
+    uses: iSmart-System/menura-actions/.github/workflows/codebase-ci-node.yml@main
+    with:
+      upload-artifacts: true  # Necessário para preview
+    secrets: inherit
+
+  preview-deploy:
+    if: github.event_name == 'pull_request'
+    needs: ci
+    uses: iSmart-System/menura-actions/.github/workflows/codebase-preview-deploy.yml@main
+    with:
+      artifact-name: 'meu-app'
+      pr-number: ${{ github.event.pull_request.number }}
+      repository-name: 'meu-app'
+      branch-name: ${{ github.head_ref }}
+    secrets:
+      dispatch-token: ${{ secrets.PREVIEW_DEPLOY_TOKEN }}
 ```
 
 ### Testar Mudança em Projeto Real
