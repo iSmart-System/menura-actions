@@ -1,0 +1,85 @@
+# =============================================================================
+# CI - Continuous Integration para Node.js (Reusable Workflow)
+# =============================================================================
+# Este workflow reutilizável executa lint, testes e build para projetos Node.js.
+# Deve ser chamado por projetos Node.js da organização Menura.
+# =============================================================================
+
+name: CI - Node.js
+
+on:
+  workflow_call:
+    inputs:
+      node-version:
+        description: 'Versão do Node.js'
+        required: false
+        type: string
+        default: '20'
+      working-directory:
+        description: 'Diretório de trabalho'
+        required: false
+        type: string
+        default: '.'
+      skip-lint:
+        description: 'Pular etapa de lint'
+        required: false
+        type: boolean
+        default: false
+      skip-tests:
+        description: 'Pular etapa de testes'
+        required: false
+        type: boolean
+        default: false
+      skip-build:
+        description: 'Pular etapa de build'
+        required: false
+        type: boolean
+        default: false
+      artifact-path:
+        description: 'Caminho dos artefatos de build (relativo ao working-directory)'
+        required: false
+        type: string
+        default: 'dist'
+
+jobs:
+  ci:
+    name: CI Pipeline
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: 'npm'
+          cache-dependency-path: ${{ inputs.working-directory }}/package-lock.json
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Executar Lint
+        if: ${{ !inputs.skip-lint }}
+        run: npm run lint --if-present
+
+      - name: Executar Testes
+        if: ${{ !inputs.skip-tests }}
+        run: npm test --if-present
+
+      - name: Executar Build
+        if: ${{ !inputs.skip-build }}
+        run: npm run build --if-present
+
+      - name: Upload artefatos de build
+        if: ${{ !inputs.skip-build }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ${{ inputs.working-directory }}/${{ inputs.artifact-path }}
+          if-no-files-found: ignore
+          retention-days: 7

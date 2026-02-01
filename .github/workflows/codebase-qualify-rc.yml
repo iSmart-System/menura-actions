@@ -1,0 +1,305 @@
+# =============================================================================
+# Qualify Release Candidate (Reusable Workflow)
+# =============================================================================
+# Este workflow qualifica uma Release Candidate como release de produção.
+# Cria a tag final (sem -rc) e abre PR de sandbox para main.
+# =============================================================================
+
+name: Qualify Release Candidate
+
+on:
+  workflow_call:
+    inputs:
+      rc-tag:
+        description: 'Tag RC a ser qualificada (ex: v1.2.0-rc.1)'
+        required: true
+        type: string
+      auto-merge:
+        description: 'Fazer merge automático do PR (requer aprovações)'
+        required: false
+        type: boolean
+        default: false
+    outputs:
+      production-tag:
+        description: 'Tag de produção criada'
+        value: ${{ jobs.promote.outputs.production-tag }}
+      pr-url:
+        description: 'URL do Pull Request criado'
+        value: ${{ jobs.create-pr.outputs.pr-url }}
+
+  workflow_dispatch:
+    inputs:
+      rc-tag:
+        description: 'Tag RC a ser qualificada (ex: v1.2.0-rc.1)'
+        required: true
+        type: string
+      auto-merge:
+        description: 'Fazer merge automático do PR'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  validate:
+    name: Validar RC Tag
+    runs-on: ubuntu-latest
+    outputs:
+      production-tag: ${{ steps.parse.outputs.production-tag }}
+      rc-tag: ${{ steps.parse.outputs.rc-tag }}
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validar e parsear tag
+        id: parse
+        run: |
+          RC_TAG="${{ inputs.rc-tag }}"
+
+          # Valida formato da tag RC
+          if [[ ! "$RC_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-rc\.[0-9]+$ ]]; then
+            echo "::error::Formato de tag inválido: $RC_TAG"
+            echo "Formato esperado: vX.Y.Z-rc.N (ex: v1.2.0-rc.1)"
+            exit 1
+          fi
+
+          # Verifica se a tag existe
+          if ! git rev-parse "$RC_TAG" >/dev/null 2>&1; then
+            echo "::error::Tag não encontrada: $RC_TAG"
+            exit 1
+          fi
+
+          # Extrai a versão de produção (remove -rc.N)
+          PROD_TAG=$(echo "$RC_TAG" | sed 's/-rc\.[0-9]*$//')
+
+          # Verifica se a tag de produção já existe
+          if git rev-parse "$PROD_TAG" >/dev/null 2>&1; then
+            echo "::error::Tag de produção já existe: $PROD_TAG"
+            exit 1
+          fi
+
+          echo "rc-tag=$RC_TAG" >> $GITHUB_OUTPUT
+          echo "production-tag=$PROD_TAG" >> $GITHUB_OUTPUT
+
+          echo "✅ Tag RC válida: $RC_TAG"
+          echo "🏷️ Tag de produção será: $PROD_TAG"
+
+  create-pr:
+    name: Criar PR para Main
+    needs: validate
+    runs-on: ubuntu-latest
+    outputs:
+      pr-url: ${{ steps.create-pr.outputs.pr-url }}
+      pr-number: ${{ steps.create-pr.outputs.pr-number }}
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verificar se PR já existe
+        id: check-pr
+        run: |
+          EXISTING_PR=$(gh pr list --base main --head sandbox --json number --jq '.[0].number' || echo "")
+
+          if [ -n "$EXISTING_PR" ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "pr-number=$EXISTING_PR" >> $GITHUB_OUTPUT
+            echo "⚠️ PR já existe: #$EXISTING_PR"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Criar Pull Request
+        id: create-pr
+        run: |
+          RC_TAG="${{ needs.validate.outputs.rc-tag }}"
+          PROD_TAG="${{ needs.validate.outputs.production-tag }}"
+
+          if [[ "${{ steps.check-pr.outputs.exists }}" == "true" ]]; then
+            PR_NUMBER="${{ steps.check-pr.outputs.pr-number }}"
+            PR_URL="https://github.com/${{ github.repository }}/pull/$PR_NUMBER"
+
+            # Atualiza o PR existente
+            gh pr edit "$PR_NUMBER" \
+              --title "🚀 Release: $PROD_TAG" \
+              --body "## Release para Produção
+
+          ### Informações
+          - **Release Candidate:** \`$RC_TAG\`
+          - **Versão de Produção:** \`$PROD_TAG\`
+
+          ### Checklist
+          - [ ] Validado no ambiente sandbox
+          - [ ] Testes de regressão executados
+          - [ ] Aprovações obtidas
+
+          ### Status
+          ✅ A tag \`$PROD_TAG\` foi criada e a release está disponível no GitHub Releases.
+
+          ### Após merge deste PR
+          O código será integrado à branch \`main\`.
+
+          ---
+          _Gerado automaticamente via GitHub Actions_
+          "
+
+            echo "✅ PR atualizado: $PR_URL"
+          else
+            # Cria novo PR
+            PR_URL=$(gh pr create \
+              --base main \
+              --head sandbox \
+              --title "🚀 Release: $PROD_TAG" \
+              --body "## Release para Produção
+
+          ### Informações
+          - **Release Candidate:** \`$RC_TAG\`
+          - **Versão de Produção:** \`$PROD_TAG\`
+
+          ### Checklist
+          - [ ] Validado no ambiente sandbox
+          - [ ] Testes de regressão executados
+          - [ ] Aprovações obtidas
+
+          ### Status
+          ✅ A tag \`$PROD_TAG\` foi criada e a release está disponível no GitHub Releases.
+
+          ### Após merge deste PR
+          O código será integrado à branch \`main\`.
+
+          ---
+          _Gerado automaticamente via GitHub Actions_
+          ")
+
+            PR_NUMBER=$(echo "$PR_URL" | grep -oP "pull/\K[0-9]+")
+            echo "✅ PR criado: $PR_URL"
+          fi
+
+          echo "pr-url=$PR_URL" >> $GITHUB_OUTPUT
+          echo "pr-number=$PR_NUMBER" >> $GITHUB_OUTPUT
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Auto-merge (se habilitado)
+        if: inputs.auto-merge == true
+        run: |
+          PR_NUMBER="${{ steps.create-pr.outputs.pr-number }}"
+          echo "🔄 Habilitando auto-merge para PR #$PR_NUMBER..."
+          gh pr merge "$PR_NUMBER" --auto --squash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  promote:
+    name: Criar Tag de Produção
+    needs: [validate, create-pr]
+    runs-on: ubuntu-latest
+    outputs:
+      production-tag: ${{ needs.validate.outputs.production-tag }}
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configurar Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Criar tag de produção
+        run: |
+          RC_TAG="${{ needs.validate.outputs.rc-tag }}"
+          PROD_TAG="${{ needs.validate.outputs.production-tag }}"
+
+          # Checkout no commit da RC tag
+          git checkout "$RC_TAG"
+
+          # Cria a tag de produção
+          git tag -a "$PROD_TAG" -m "Release: $PROD_TAG
+
+          Promovido a partir de: $RC_TAG
+
+          Criado automaticamente via GitHub Actions.
+
+          Commit: ${{ github.sha }}
+          Autor: ${{ github.actor }}
+          Data: $(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          PR: ${{ needs.create-pr.outputs.pr-url }}
+          "
+
+          # Push da tag
+          git push origin "$PROD_TAG"
+
+          echo "✅ Tag de produção criada: $PROD_TAG"
+
+      - name: Criar GitHub Release
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const rcTag = '${{ needs.validate.outputs.rc-tag }}';
+            const prodTag = '${{ needs.validate.outputs.production-tag }}';
+            const prUrl = '${{ needs.create-pr.outputs.pr-url }}';
+
+            // Busca a release da RC para copiar as notas
+            let rcNotes = '';
+            try {
+              const rcRelease = await github.rest.repos.getReleaseByTag({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                tag: rcTag
+              });
+              rcNotes = rcRelease.data.body || '';
+            } catch (e) {
+              console.log('RC release não encontrada, continuando sem notas...');
+            }
+
+            const release = await github.rest.repos.createRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag_name: prodTag,
+              name: `🚀 Release: ${prodTag}`,
+              body: `## Release de Produção
+
+            Esta é a versão de **produção** \`${prodTag}\`.
+
+            ### Informações
+            - **Tag:** \`${prodTag}\`
+            - **Promovido de:** \`${rcTag}\`
+            - **PR:** ${prUrl}
+
+            ### Notas da Release Candidate
+            ${rcNotes}
+
+            ---
+            _Release gerada automaticamente via GitHub Actions_
+            `,
+              draft: false,
+              prerelease: false
+            });
+
+            console.log(`✅ Release criada: ${release.data.html_url}`);
+
+      - name: Resumo
+        run: |
+          echo "## 🚀 Promoção para Produção" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Tags" >> $GITHUB_STEP_SUMMARY
+          echo "- **RC Tag:** \`${{ needs.validate.outputs.rc-tag }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Production Tag:** \`${{ needs.validate.outputs.production-tag }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Pull Request" >> $GITHUB_STEP_SUMMARY
+          echo "- **URL:** ${{ needs.create-pr.outputs.pr-url }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Próximos passos" >> $GITHUB_STEP_SUMMARY
+          echo "1. Revisar e aprovar o PR" >> $GITHUB_STEP_SUMMARY
+          echo "2. Fazer merge para integrar à branch main" >> $GITHUB_STEP_SUMMARY
+          echo "3. A release de produção já está disponível para uso" >> $GITHUB_STEP_SUMMARY

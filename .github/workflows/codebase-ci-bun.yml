@@ -1,0 +1,98 @@
+# =============================================================================
+# CI - Continuous Integration para Bun (Reusable Workflow)
+# =============================================================================
+# Este workflow reutilizável executa lint, testes e build para projetos Bun.
+# Deve ser chamado por projetos Bun da organização Menura.
+# =============================================================================
+
+name: CI - Bun
+
+on:
+  workflow_call:
+    inputs:
+      bun-version:
+        description: 'Versão do Bun'
+        required: false
+        type: string
+        default: 'latest'
+      working-directory:
+        description: 'Diretório de trabalho'
+        required: false
+        type: string
+        default: '.'
+      skip-lint:
+        description: 'Pular etapa de lint'
+        required: false
+        type: boolean
+        default: false
+      skip-tests:
+        description: 'Pular etapa de testes'
+        required: false
+        type: boolean
+        default: false
+      skip-build:
+        description: 'Pular etapa de build'
+        required: false
+        type: boolean
+        default: false
+      artifact-path:
+        description: 'Caminho dos artefatos de build (relativo ao working-directory)'
+        required: false
+        type: string
+        default: 'dist'
+
+jobs:
+  ci:
+    name: CI Pipeline
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: ${{ inputs.bun-version }}
+
+      - name: Instalar dependências
+        run: bun install --frozen-lockfile
+
+      - name: Executar Lint
+        if: ${{ !inputs.skip-lint }}
+        run: |
+          if grep -q '"lint"' package.json; then
+            bun run lint
+          else
+            echo "⚠️ Script 'lint' não encontrado, pulando..."
+          fi
+
+      - name: Executar Testes
+        if: ${{ !inputs.skip-tests }}
+        run: |
+          if grep -q '"test"' package.json || [ -d "test" ] || [ -d "__tests__" ] || compgen -G "*.test.*" > /dev/null; then
+            bun test
+          else
+            echo "⚠️ Testes não encontrados, pulando..."
+          fi
+
+      - name: Executar Build
+        if: ${{ !inputs.skip-build }}
+        run: |
+          if grep -q '"build"' package.json; then
+            bun run build
+          else
+            echo "⚠️ Script 'build' não encontrado, pulando..."
+          fi
+
+      - name: Upload artefatos de build
+        if: ${{ !inputs.skip-build }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ${{ inputs.working-directory }}/${{ inputs.artifact-path }}
+          if-no-files-found: ignore
+          retention-days: 7

@@ -1,0 +1,26 @@
+# =============================================================================
+# Exemplo: Release para projeto CODEBASE - Bun
+# =============================================================================
+# Copie este arquivo para .github/workflows/release.yml no seu projeto
+# Este workflow gera artefatos .zip e publica no GitHub Releases
+# =============================================================================
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+      - 'v[0-9]+.[0-9]+.[0-9]+-rc.[0-9]+'
+
+jobs:
+  release:
+    uses: iSmart-System/menura-actions/.github/workflows/codebase-release-bun.yml@main
+    with:
+      bun-version: 'latest'
+      build-command: 'bun run build'
+      artifact-name: 'meu-projeto'
+      artifact-path: 'dist'
+      # working-directory: '.'
+      # include-source: false
+    secrets: inherit

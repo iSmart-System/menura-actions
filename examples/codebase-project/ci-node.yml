@@ -1,0 +1,25 @@
+# =============================================================================
+# Exemplo: CI para projeto CODEBASE com Node.js
+# =============================================================================
+# Copie este arquivo para .github/workflows/ci.yml no seu projeto
+# =============================================================================
+
+name: CI
+
+on:
+  pull_request:
+    branches: [sandbox, main]
+  push:
+    branches: [sandbox, main]
+
+jobs:
+  ci:
+    uses: iSmart-System/menura-actions/.github/workflows/codebase-ci-node.yml@main
+    with:
+      node-version: '20'
+      # working-directory: '.'
+      # artifact-path: 'dist'  # ou 'build', '.next', 'out', etc
+      # skip-lint: false
+      # skip-tests: false
+      # skip-build: false
+    secrets: inherit

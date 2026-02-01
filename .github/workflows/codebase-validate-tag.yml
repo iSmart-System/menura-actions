@@ -1,0 +1,150 @@
+# =============================================================================
+# Validate Tag (Reusable Workflow)
+# =============================================================================
+# Este workflow valida a nomenclatura de tags seguindo o padrão SemVer.
+# É executado automaticamente quando uma tag é criada.
+# =============================================================================
+
+name: Validate Tag
+
+on:
+  workflow_call:
+
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  validate:
+    name: Validar Nomenclatura da Tag
+    runs-on: ubuntu-latest
+    outputs:
+      is-valid: ${{ steps.validate.outputs.is-valid }}
+      tag-type: ${{ steps.validate.outputs.tag-type }}
+      version: ${{ steps.validate.outputs.version }}
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validar tag
+        id: validate
+        run: |
+          TAG="${{ github.ref_name }}"
+
+          echo "🏷️ Validando tag: $TAG"
+
+          # Regex para tag de produção: vX.Y.Z
+          PROD_REGEX="^v[0-9]+\.[0-9]+\.[0-9]+$"
+
+          # Regex para tag RC: vX.Y.Z-rc.N
+          RC_REGEX="^v[0-9]+\.[0-9]+\.[0-9]+-rc\.[0-9]+$"
+
+          # Regex genérica para qualquer tag válida
+          VALID_REGEX="^v[0-9]+\.[0-9]+\.[0-9]+(-rc\.[0-9]+)?$"
+
+          if [[ "$TAG" =~ $PROD_REGEX ]]; then
+            echo "✅ Tag de produção válida: $TAG"
+            echo "is-valid=true" >> $GITHUB_OUTPUT
+            echo "tag-type=production" >> $GITHUB_OUTPUT
+            echo "version=$TAG" >> $GITHUB_OUTPUT
+
+          elif [[ "$TAG" =~ $RC_REGEX ]]; then
+            echo "✅ Tag de Release Candidate válida: $TAG"
+            echo "is-valid=true" >> $GITHUB_OUTPUT
+            echo "tag-type=rc" >> $GITHUB_OUTPUT
+            # Extrai versão base
+            VERSION=$(echo "$TAG" | sed 's/-rc\.[0-9]*$//')
+            echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+          else
+            echo "::error::Tag inválida: $TAG"
+            echo ""
+            echo "Formatos válidos:"
+            echo "  - Produção: vX.Y.Z (ex: v1.2.3)"
+            echo "  - RC: vX.Y.Z-rc.N (ex: v1.2.3-rc.1)"
+            echo ""
+            echo "is-valid=false" >> $GITHUB_OUTPUT
+            echo "tag-type=invalid" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
+      - name: Verificar branch de origem
+        run: |
+          TAG="${{ github.ref_name }}"
+          TAG_TYPE="${{ steps.validate.outputs.tag-type }}"
+
+          # Encontra a branch que contém o commit da tag
+          BRANCHES=$(git branch -r --contains "${{ github.sha }}" | sed 's/origin\///' | tr -d ' ')
+
+          echo "📍 Branches que contêm este commit:"
+          echo "$BRANCHES"
+
+          if [[ "$TAG_TYPE" == "production" ]]; then
+            if ! echo "$BRANCHES" | grep -q "^main$"; then
+              echo "::warning::Tag de produção criada fora da branch main"
+              echo "Recomendação: Tags de produção devem ser criadas a partir de main"
+            fi
+          elif [[ "$TAG_TYPE" == "rc" ]]; then
+            if ! echo "$BRANCHES" | grep -q "^sandbox$"; then
+              echo "::warning::Tag RC criada fora da branch sandbox"
+              echo "Recomendação: Tags RC devem ser criadas a partir de sandbox"
+            fi
+          fi
+
+      - name: Verificar sequência de versões
+        run: |
+          TAG="${{ github.ref_name }}"
+          VERSION="${{ steps.validate.outputs.version }}"
+          TAG_TYPE="${{ steps.validate.outputs.tag-type }}"
+
+          echo "📊 Verificando sequência de versões..."
+
+          # Busca tags existentes
+          git fetch --tags
+
+          if [[ "$TAG_TYPE" == "production" ]]; then
+            # Para produção, verifica se já existe RC para esta versão
+            RC_EXISTS=$(git tag -l "${VERSION}-rc.*" | head -n 1 || echo "")
+
+            if [ -z "$RC_EXISTS" ]; then
+              echo "::warning::Nenhuma tag RC encontrada para a versão $VERSION"
+              echo "Recomendação: Versões de produção devem passar por RC primeiro"
+            else
+              echo "✅ Tag RC encontrada: $RC_EXISTS"
+            fi
+          fi
+
+          # Lista últimas tags para contexto
+          echo ""
+          echo "📋 Últimas tags:"
+          git tag -l "v*" --sort=-v:refname | head -n 10
+
+      - name: Resumo
+        run: |
+          TAG="${{ github.ref_name }}"
+          TAG_TYPE="${{ steps.validate.outputs.tag-type }}"
+          VERSION="${{ steps.validate.outputs.version }}"
+
+          if [[ "$TAG_TYPE" == "production" ]]; then
+            EMOJI="🚀"
+            TYPE_DESC="Produção"
+          elif [[ "$TAG_TYPE" == "rc" ]]; then
+            EMOJI="🚧"
+            TYPE_DESC="Release Candidate"
+          else
+            EMOJI="❌"
+            TYPE_DESC="Inválida"
+          fi
+
+          echo "## $EMOJI Validação de Tag" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Campo | Valor |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| **Tag** | \`$TAG\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Tipo** | $TYPE_DESC |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Versão base** | \`$VERSION\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Commit** | \`${{ github.sha }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Autor** | ${{ github.actor }} |" >> $GITHUB_STEP_SUMMARY

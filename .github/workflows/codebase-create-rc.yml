@@ -1,0 +1,204 @@
+# =============================================================================
+# Create Release Candidate Tag (Reusable Workflow)
+# =============================================================================
+# Este workflow cria tags de Release Candidate automaticamente.
+# Segue o padrão: vX.Y.Z-rc.N
+# =============================================================================
+
+name: Create RC Tag
+
+on:
+  workflow_call:
+    inputs:
+      version-type:
+        description: 'Tipo de incremento de versão'
+        required: false
+        type: string
+        default: 'patch'
+    outputs:
+      tag:
+        description: 'Tag criada'
+        value: ${{ jobs.create-tag.outputs.tag }}
+      version:
+        description: 'Versão criada'
+        value: ${{ jobs.create-tag.outputs.version }}
+
+  workflow_dispatch:
+    inputs:
+      version-type:
+        description: 'Tipo de incremento de versão'
+        required: true
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+        default: 'patch'
+
+jobs:
+  validate:
+    name: Validar Branch
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verificar branch
+        run: |
+          if [[ "${{ github.ref_name }}" != "sandbox" ]]; then
+            echo "::error::Release Candidates só podem ser criados a partir da branch 'sandbox'"
+            echo "Branch atual: ${{ github.ref_name }}"
+            exit 1
+          fi
+          echo "✅ Branch validada: sandbox"
+
+  create-tag:
+    name: Criar Tag RC
+    needs: validate
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.create.outputs.tag }}
+      version: ${{ steps.create.outputs.version }}
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configurar Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Calcular próxima versão
+        id: version
+        run: |
+          # Busca todas as tags
+          git fetch --tags
+
+          # Encontra a última tag de release (sem -rc)
+          LAST_RELEASE=$(git tag -l "v[0-9]*.[0-9]*.[0-9]*" --sort=-v:refname | grep -v "\-rc" | head -n 1 || echo "")
+
+          if [ -z "$LAST_RELEASE" ]; then
+            LAST_RELEASE="v0.0.0"
+          fi
+
+          echo "📦 Última release: $LAST_RELEASE"
+
+          # Extrai major, minor, patch
+          VERSION=${LAST_RELEASE#v}
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
+
+          # Incrementa baseado no tipo
+          VERSION_TYPE="${{ inputs.version-type }}"
+          case "$VERSION_TYPE" in
+            major)
+              MAJOR=$((MAJOR + 1))
+              MINOR=0
+              PATCH=0
+              ;;
+            minor)
+              MINOR=$((MINOR + 1))
+              PATCH=0
+              ;;
+            patch)
+              PATCH=$((PATCH + 1))
+              ;;
+          esac
+
+          NEW_VERSION="v${MAJOR}.${MINOR}.${PATCH}"
+          echo "🆕 Nova versão base: $NEW_VERSION"
+
+          # Encontra o próximo número RC para esta versão
+          LAST_RC=$(git tag -l "${NEW_VERSION}-rc.*" --sort=-v:refname | head -n 1 || echo "")
+
+          if [ -z "$LAST_RC" ]; then
+            RC_NUMBER=1
+          else
+            # Extrai o número do RC
+            RC_NUMBER=$(echo "$LAST_RC" | grep -oP "rc\.\K[0-9]+" || echo "0")
+            RC_NUMBER=$((RC_NUMBER + 1))
+          fi
+
+          FINAL_TAG="${NEW_VERSION}-rc.${RC_NUMBER}"
+
+          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "tag=$FINAL_TAG" >> $GITHUB_OUTPUT
+          echo "🏷️ Tag a ser criada: $FINAL_TAG"
+
+      - name: Criar tag
+        id: create
+        run: |
+          TAG="${{ steps.version.outputs.tag }}"
+          VERSION="${{ steps.version.outputs.version }}"
+
+          echo "🏷️ Criando tag: $TAG"
+
+          # Cria a tag anotada
+          git tag -a "$TAG" -m "Release Candidate: $TAG
+
+          Criado automaticamente via GitHub Actions.
+
+          Versão base: $VERSION
+          Branch: ${{ github.ref_name }}
+          Commit: ${{ github.sha }}
+          Autor: ${{ github.actor }}
+          Data: $(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          "
+
+          # Push da tag
+          git push origin "$TAG"
+
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "✅ Tag criada com sucesso: $TAG"
+
+      - name: Criar GitHub Release
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const tag = '${{ steps.create.outputs.tag }}';
+            const version = '${{ steps.create.outputs.version }}';
+
+            const release = await github.rest.repos.createRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag_name: tag,
+              name: `🚧 Release Candidate: ${tag}`,
+              body: `## Release Candidate
+
+            Esta é uma **Release Candidate** para a versão \`${version}\`.
+
+            ### ⚠️ Atenção
+            - Esta versão está em **homologação** no ambiente sandbox
+            - **NÃO** deve ser usada em produção
+            - Após validação, será promovida para release de produção
+
+            ### Informações
+            - **Tag:** \`${tag}\`
+            - **Versão alvo:** \`${version}\`
+            - **Branch:** \`${{ github.ref_name }}\`
+            - **Commit:** \`${{ github.sha }}\`
+
+            ### Próximos passos
+            1. Validar no ambiente sandbox
+            2. Se OK, executar workflow "Qualify RC"
+            3. Se NOK, criar nova RC com correções
+            `,
+              draft: false,
+              prerelease: true
+            });
+
+            console.log(`✅ Release criada: ${release.data.html_url}`);
+
+      - name: Resumo
+        run: |
+          echo "## 🏷️ Release Candidate Criada" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tag:** \`${{ steps.create.outputs.tag }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Versão base:** \`${{ steps.create.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch:** \`${{ github.ref_name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Próximos passos" >> $GITHUB_STEP_SUMMARY
+          echo "1. Validar no ambiente sandbox" >> $GITHUB_STEP_SUMMARY
+          echo "2. Se aprovado, executar **Qualify RC**" >> $GITHUB_STEP_SUMMARY

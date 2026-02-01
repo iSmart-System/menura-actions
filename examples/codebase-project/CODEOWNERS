@@ -1,0 +1,16 @@
+# CODEOWNERS
+# Copie este arquivo para .github/CODEOWNERS no seu projeto
+# Docs: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Todo código deve ser revisado pelo time root
+* @iSmart-System/root
+
+# =============================================================================
+# Customize conforme a estrutura de times do seu projeto
+# =============================================================================
+# Exemplo: owners diferentes para partes específicas (última regra vence)
+#
+# /src/ @iSmart-System/backend-team
+# /src/frontend/ @iSmart-System/frontend-team
+# /.github/workflows/ @iSmart-System/platform-team
+# /docs/ @iSmart-System/tech-writers

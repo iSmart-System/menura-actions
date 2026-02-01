@@ -1,0 +1,47 @@
+# =============================================================================
+# Exemplo: Gestão de Releases para projeto CODEBASE
+# =============================================================================
+# Copie este arquivo para .github/workflows/release-management.yml no seu projeto
+# Permite criar RCs e qualificar RC para produção via interface manual
+# =============================================================================
+
+name: Release Management
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Ação a executar'
+        required: true
+        type: choice
+        options:
+          - create-rc
+          - qualify-rc
+      version-type:
+        description: 'Tipo de versão (apenas para create-rc)'
+        required: false
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+        default: 'patch'
+      rc-tag:
+        description: 'Tag RC a qualificar (apenas para qualify-rc)'
+        required: false
+        type: string
+
+jobs:
+  create-rc:
+    if: inputs.action == 'create-rc'
+    uses: iSmart-System/menura-actions/.github/workflows/codebase-create-rc.yml@main
+    with:
+      version-type: ${{ inputs.version-type }}
+    secrets: inherit
+
+  qualify-rc:
+    if: inputs.action == 'qualify-rc'
+    uses: iSmart-System/menura-actions/.github/workflows/codebase-qualify-rc.yml@main
+    with:
+      rc-tag: ${{ inputs.rc-tag }}
+    secrets: inherit

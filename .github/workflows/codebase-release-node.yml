@@ -1,0 +1,305 @@
+# =============================================================================
+# Codebase Release - Node.js (Reusable Workflow)
+# =============================================================================
+# Este workflow gera artefatos (.zip) e publica no GitHub Releases.
+# Usado por repositórios do arquétipo CODEBASE que usam Node.js.
+# =============================================================================
+
+name: Codebase Release - Node.js
+
+on:
+  workflow_call:
+    inputs:
+      node-version:
+        description: 'Versão do Node.js'
+        required: false
+        type: string
+        default: '20'
+      working-directory:
+        description: 'Diretório de trabalho'
+        required: false
+        type: string
+        default: '.'
+      build-command:
+        description: 'Comando de build'
+        required: false
+        type: string
+        default: 'npm run build'
+      artifact-name:
+        description: 'Nome do artefato (sem extensão)'
+        required: false
+        type: string
+        default: 'release'
+      artifact-path:
+        description: 'Caminho dos arquivos para incluir no artefato'
+        required: false
+        type: string
+        default: 'dist'
+      include-source:
+        description: 'Incluir código fonte no artefato'
+        required: false
+        type: boolean
+        default: false
+    outputs:
+      version:
+        description: 'Versão da release'
+        value: ${{ jobs.release.outputs.version }}
+      artifact-url:
+        description: 'URL do artefato'
+        value: ${{ jobs.release.outputs.artifact-url }}
+      release-url:
+        description: 'URL da release no GitHub'
+        value: ${{ jobs.release.outputs.release-url }}
+
+jobs:
+  validate:
+    name: Validar Tag
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      is-rc: ${{ steps.version.outputs.is-rc }}
+
+    steps:
+      - name: Verificar trigger
+        run: |
+          if [[ "${{ github.ref_type }}" != "tag" ]]; then
+            echo "::error::Este workflow deve ser executado a partir de uma tag"
+            exit 1
+          fi
+
+      - name: Extrair versão
+        id: version
+        run: |
+          TAG="${{ github.ref_name }}"
+
+          # Validar formato da tag
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-rc\.[0-9]+)?$ ]]; then
+            echo "::error::Tag inválida: $TAG"
+            echo "Formato esperado: vX.Y.Z ou vX.Y.Z-rc.N"
+            exit 1
+          fi
+
+          # Verificar se é RC
+          if [[ "$TAG" =~ -rc\.[0-9]+$ ]]; then
+            echo "is-rc=true" >> $GITHUB_OUTPUT
+            echo "📦 Release Candidate: $TAG"
+          else
+            echo "is-rc=false" >> $GITHUB_OUTPUT
+            echo "📦 Release de Produção: $TAG"
+          fi
+
+          echo "version=$TAG" >> $GITHUB_OUTPUT
+
+  build:
+    name: Build Artefato
+    needs: validate
+    runs-on: ubuntu-latest
+    outputs:
+      artifact-name: ${{ steps.package.outputs.artifact-name }}
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: 'npm'
+          cache-dependency-path: ${{ inputs.working-directory }}/package-lock.json
+
+      - name: Instalar dependências
+        working-directory: ${{ inputs.working-directory }}
+        run: npm ci
+
+      - name: Build
+        working-directory: ${{ inputs.working-directory }}
+        run: ${{ inputs.build-command }}
+        env:
+          NODE_ENV: production
+
+      - name: Criar pacote
+        id: package
+        working-directory: ${{ inputs.working-directory }}
+        run: |
+          VERSION="${{ needs.validate.outputs.version }}"
+          ARTIFACT_NAME="${{ inputs.artifact-name }}-${VERSION}"
+
+          echo "📦 Criando artefato: ${ARTIFACT_NAME}.zip"
+
+          # Criar diretório temporário
+          mkdir -p /tmp/release-package
+
+          # Copiar arquivos de build
+          if [ -d "${{ inputs.artifact-path }}" ]; then
+            cp -r ${{ inputs.artifact-path }}/* /tmp/release-package/
+          else
+            echo "::warning::Diretório de build não encontrado: ${{ inputs.artifact-path }}"
+          fi
+
+          # Incluir source se solicitado
+          if [ "${{ inputs.include-source }}" == "true" ]; then
+            mkdir -p /tmp/release-package/src
+            cp -r src/* /tmp/release-package/src/ 2>/dev/null || true
+            cp package.json /tmp/release-package/ 2>/dev/null || true
+          fi
+
+          # Adicionar metadados
+          cat > /tmp/release-package/BUILD_INFO.json << EOF
+          {
+            "version": "${VERSION}",
+            "build_date": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+            "commit": "${{ github.sha }}",
+            "branch": "${{ github.ref_name }}",
+            "repository": "${{ github.repository }}",
+            "workflow_run": "${{ github.run_id }}"
+          }
+          EOF
+
+          # Criar ZIP
+          cd /tmp/release-package
+          zip -r /tmp/${ARTIFACT_NAME}.zip .
+
+          # Mover para workspace
+          mv /tmp/${ARTIFACT_NAME}.zip ${{ github.workspace }}/
+
+          echo "artifact-name=${ARTIFACT_NAME}" >> $GITHUB_OUTPUT
+          echo "✅ Artefato criado: ${ARTIFACT_NAME}.zip"
+
+      - name: Upload artefato
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.package.outputs.artifact-name }}
+          path: ${{ steps.package.outputs.artifact-name }}.zip
+          retention-days: 90
+
+  release:
+    name: Publicar Release
+    needs: [validate, build]
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ needs.validate.outputs.version }}
+      artifact-url: ${{ steps.upload.outputs.artifact-url }}
+      release-url: ${{ steps.create-release.outputs.release-url }}
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download artefato
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.build.outputs.artifact-name }}
+
+      - name: Criar GitHub Release
+        id: create-release
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const version = '${{ needs.validate.outputs.version }}';
+            const isRC = '${{ needs.validate.outputs.is-rc }}' === 'true';
+            const artifactName = '${{ needs.build.outputs.artifact-name }}';
+
+            const releaseName = isRC
+              ? `🚧 Release Candidate: ${version}`
+              : `🚀 Release: ${version}`;
+
+            const body = isRC
+              ? `## Release Candidate
+
+            Esta é uma **Release Candidate** para validação.
+
+            ### ⚠️ Atenção
+            - Este artefato está em **homologação**
+            - **NÃO** deve ser usado em produção
+            - Após validação, será promovido para release final
+
+            ### Artefato
+            - **Arquivo:** \`${artifactName}.zip\`
+            - **Versão:** \`${version}\`
+            - **Commit:** \`${{ github.sha }}\`
+
+            ---
+            _Gerado automaticamente via GitHub Actions_
+            `
+              : `## Release de Produção
+
+            Esta é a versão de **produção** \`${version}\`.
+
+            ### Artefato
+            - **Arquivo:** \`${artifactName}.zip\`
+            - **Versão:** \`${version}\`
+            - **Commit:** \`${{ github.sha }}\`
+
+            ### Como usar
+            1. Baixe o artefato \`${artifactName}.zip\`
+            2. Extraia em seu ambiente
+            3. Siga as instruções de deploy
+
+            ---
+            _Gerado automaticamente via GitHub Actions_
+            `;
+
+            const release = await github.rest.repos.createRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag_name: version,
+              name: releaseName,
+              body: body,
+              draft: false,
+              prerelease: isRC
+            });
+
+            console.log(`✅ Release criada: ${release.data.html_url}`);
+            core.setOutput('release-url', release.data.html_url);
+            core.setOutput('release-id', release.data.id);
+
+            return release.data.id;
+
+      - name: Upload artefato para Release
+        id: upload
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const artifactName = '${{ needs.build.outputs.artifact-name }}';
+            const releaseId = ${{ steps.create-release.outputs.result }};
+
+            const artifactPath = `${artifactName}.zip`;
+            const artifactContent = fs.readFileSync(artifactPath);
+
+            const upload = await github.rest.repos.uploadReleaseAsset({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id: releaseId,
+              name: `${artifactName}.zip`,
+              data: artifactContent
+            });
+
+            console.log(`✅ Artefato uploaded: ${upload.data.browser_download_url}`);
+            core.setOutput('artifact-url', upload.data.browser_download_url);
+
+      - name: Resumo
+        run: |
+          VERSION="${{ needs.validate.outputs.version }}"
+          IS_RC="${{ needs.validate.outputs.is-rc }}"
+          ARTIFACT="${{ needs.build.outputs.artifact-name }}.zip"
+
+          if [ "$IS_RC" == "true" ]; then
+            EMOJI="🚧"
+            TYPE="Release Candidate"
+          else
+            EMOJI="🚀"
+            TYPE="Release de Produção"
+          fi
+
+          echo "## $EMOJI $TYPE" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Campo | Valor |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| **Versão** | \`$VERSION\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Artefato** | \`$ARTIFACT\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Commit** | \`${{ github.sha }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Release** | ${{ steps.create-release.outputs.release-url }} |" >> $GITHUB_STEP_SUMMARY
