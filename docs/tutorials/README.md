@@ -9,6 +9,7 @@
 
 | Tutorial | Nível | Tempo |
 |----------|-------|-------|
+| [Setup Completo de Novo Repositório](setup-novo-repositorio.md) | Iniciante | 45 min |
 | [Primeiros Passos](getting-started.md) | Iniciante | 15 min |
 | [Criando uma Release](first-release.md) | Intermediário | 25 min |
 

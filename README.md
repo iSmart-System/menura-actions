@@ -31,6 +31,25 @@ flowchart TB
 
 ---
 
+## 🚀 Criando um Novo Repositório?
+
+**Siga nosso guia completo de setup para nascer com todas as melhores práticas:**
+
+👉 **[Setup Completo de Novo Repositório Codebase](docs/tutorials/setup-novo-repositorio.md)** 👈
+
+Este guia inclui:
+- ✅ Estrutura de branches (sandbox/main)
+- ✅ Workflows CI/CD completos
+- ✅ Proteção de branches configurada
+- ✅ Preview deploy opcional
+- ✅ Code review obrigatório
+- ✅ Templates de PR/Issue
+- ✅ Documentação básica
+
+**Tempo:** ~45 minutos | **Resultado:** Repositório production-ready
+
+---
+
 ## Fluxo Codebase
 
 ### Fluxo de Desenvolvimento

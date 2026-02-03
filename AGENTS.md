@@ -276,6 +276,23 @@ docs(readme): melhorar seção de instalação
 
 ## Common Tasks
 
+### Configurar Novo Repositório Codebase
+
+Para configurar um novo repositório com **todas as melhores práticas**, siga o guia completo:
+
+📖 **[Tutorial: Setup Completo de Novo Repositório](docs/tutorials/setup-novo-repositorio.md)**
+
+Este guia inclui:
+- Estrutura de branches (sandbox/main)
+- Workflows CI/CD (Node.js ou Bun)
+- Proteção de branches
+- Preview deploy (opcional)
+- Code Owners
+- Templates de PR/Issue
+- Documentação básica
+
+**Resultado:** Repositório production-ready em ~45 minutos
+
 ### Adicionar Novo Workflow
 
 1. Criar arquivo em `.github/workflows/codebase-{nome}.yml` ou `.github/workflows/codebase-{nome}-{tech}.yml`

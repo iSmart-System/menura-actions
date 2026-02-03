@@ -22,6 +22,7 @@ docs/
 
 | Tutorial | Descrição |
 |----------|-----------|
+| [Setup Completo de Novo Repositório](tutorials/setup-novo-repositorio.md) | Configure um novo repo com todas as melhores práticas |
 | [Primeiros Passos](tutorials/getting-started.md) | Configure seu primeiro projeto com menura-actions |
 | [Criando uma Release](tutorials/first-release.md) | Aprenda o fluxo completo de release |
 
