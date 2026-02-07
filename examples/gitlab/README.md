@@ -136,6 +136,12 @@ variables:
 
 ### Preview Deploy
 
+```yaml
+variables:
+  ARTIFACT_NAME: "meu-app"                          # Nome do artefato (obrigatório)
+  PREVIEW_URL: "https://app.sandbox.menura.com.br"  # URL do preview (obrigatório)
+```
+
 O preview deploy é disparado automaticamente via **GitLab Pipeline Triggers** para o repositório `m3nura/cloud-foundation`.
 
 ---
@@ -186,6 +192,7 @@ stages:
 variables:
   NODE_VERSION: "20"
   ARTIFACT_NAME: "meu-app"
+  PREVIEW_URL: "https://app.sandbox.menura.com.br"
 
 lint:
   extends: .node-lint
@@ -222,7 +229,8 @@ variables:
   ARTIFACT_PATH: "build"
   SKIP_LINT: "true"
   SKIP_TESTS: "true"
-  ARTIFACT_NAME: "docs"
+  ARTIFACT_NAME: "menura-documentation-portal"
+  PREVIEW_URL: "https://docs.sandbox.menura.com.br"
 
 build:
   extends: .node-build
@@ -251,17 +259,6 @@ deploy-staging:
     url: https://staging.example.com
   rules:
     - if: '$CI_COMMIT_BRANCH == "develop"'
-```
-
-### Preview Deploy com URL Customizada
-
-```yaml
-preview:
-  extends: .preview-deploy
-  variables:
-    ARTIFACT_NAME: "meu-app"
-  environment:
-    url: https://preview-mr-$CI_MERGE_REQUEST_IID.custom.menura.com
 ```
 
 ---
@@ -416,6 +413,7 @@ Após configurar, verifique:
 - Job `build` completou com sucesso?
 - Variable `PREVIEW_DEPLOY_TOKEN` está configurada?
 - Variable `ARTIFACT_NAME` está definida?
+- Variable `PREVIEW_URL` está definida?
 
 ### Variable não está disponível
 

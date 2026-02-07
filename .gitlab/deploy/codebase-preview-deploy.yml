@@ -22,6 +22,13 @@
         exit 1
       fi
 
+      if [ -z "$PREVIEW_URL" ]; then
+        echo "❌ PREVIEW_URL não definido"
+        echo "Configure: variables.PREVIEW_URL no seu .gitlab-ci.yml"
+        echo "Exemplo: PREVIEW_URL: \"https://docs.sandbox.menura.com.br\""
+        exit 1
+      fi
+
       if [ -z "$CI_MERGE_REQUEST_IID" ]; then
         echo "❌ Apenas disponível em Merge Requests"
         exit 1
@@ -94,7 +101,7 @@
       fi
   environment:
     name: preview/mr-$CI_MERGE_REQUEST_IID
-    url: https://preview-mr-$CI_MERGE_REQUEST_IID.sandbox.menura.com
+    url: $PREVIEW_URL
     auto_stop_in: 7 days
     deployment_tier: development
   rules:

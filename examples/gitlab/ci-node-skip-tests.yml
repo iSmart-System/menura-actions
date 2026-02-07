@@ -25,6 +25,8 @@ variables:
   ARTIFACT_PATH: "build"
   SKIP_LINT: "true"   # Pular lint
   SKIP_TESTS: "true"  # Pular testes
+  ARTIFACT_NAME: "menura-documentation-portal"
+  PREVIEW_URL: "https://docs.sandbox.menura.com.br"  # URL do preview deploy
 
 # Job de build
 build:
@@ -33,8 +35,6 @@ build:
 # Job de preview deploy (manual)
 preview:
   extends: .preview-deploy
-  variables:
-    ARTIFACT_NAME: "menura-documentation-portal"
   needs:
     - job: build
       artifacts: true
