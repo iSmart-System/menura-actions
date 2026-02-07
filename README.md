@@ -8,14 +8,53 @@ Repositório central de governança de pipelines CI/CD para repositórios **Code
 
 O menura-pipelines fornece templates reutilizáveis de CI/CD para repositórios que contêm código fonte de aplicações, com suporte para **GitHub Actions** e **GitLab CI/CD**.
 
-**📚 Documentação Específica:**
-- [GitHub Actions](examples/github/) - Workflows para GitHub
-- [GitLab CI/CD](GITLAB.md) - Pipelines para GitLab
+### Propósito
+
+- Padronizar pipelines de CI/CD para repositórios Codebase
+- Automatizar gestão de releases e tags
+- Garantir governança e qualidade nas releases
+- Gerar artefatos e publicar releases
+- Suportar múltiplas plataformas de CI/CD
+
+### Escopo
+
+**✅ Repositórios Codebase:**
+- Aplicações frontend (React, Next.js, etc)
+- APIs e backends (Node.js, Bun, etc)
+- Microservices
+- Bibliotecas compartilhadas
+
+**❌ Fora do escopo:**
+- Repositórios de infraestrutura (Terraform/Terragrunt)
+- Repositórios de documentação pura
+- Repositórios de configuração
+
+> **Nota:** Repositórios de infraestrutura mantêm suas próprias pipelines localmente.
+
+---
+
+## 📚 Documentação por Plataforma
+
+Escolha sua plataforma de CI/CD para ver a documentação completa e exemplos:
+
+### GitHub Actions
+- 📖 [Documentação e Exemplos](examples/github/)
+- 🔧 [Templates Disponíveis](.github/workflows/)
+- 📝 Configuração via `workflow_call`
+
+### GitLab CI/CD
+- 📖 [Documentação Completa](GITLAB.md)
+- 🔧 [Templates Disponíveis](.gitlab/)
+- 📝 Configuração via `include` + `extends`
+
+---
+
+## Arquitetura
 
 ```mermaid
 flowchart TB
     subgraph ORG["🏢 Organização Menura"]
-        MA["📦 menura-actions<br/>(Governança Central)"]
+        MP["📦 menura-pipelines<br/>(Governança Central)"]
 
         subgraph CODEBASE_REPOS["Repositórios Codebase"]
             C1["App Frontend"]
@@ -24,41 +63,27 @@ flowchart TB
             C4["Libs Compartilhadas"]
         end
 
-        MA -->|"codebase-*<br/>workflows"| CODEBASE_REPOS
-        CODEBASE_REPOS -->|"Releases"| GHR["📦 GitHub Releases<br/>(Artefatos .zip)"]
+        MP -->|"Templates<br/>Reutilizáveis"| CODEBASE_REPOS
+        CODEBASE_REPOS -->|"Releases"| REL["📦 Releases<br/>(Artefatos + Tags)"]
     end
 
-    style MA fill:#f4a261,stroke:#264653,color:#000,stroke-width:3px
+    style MP fill:#f4a261,stroke:#264653,color:#000,stroke-width:3px
     style CODEBASE_REPOS fill:#a8dadc,stroke:#264653
-    style GHR fill:#2a9d8f,stroke:#264653,color:#fff
+    style REL fill:#2a9d8f,stroke:#264653,color:#fff
 ```
 
-> **Nota:** Repositórios de infraestrutura (Terraform/Terragrunt) mantêm suas próprias pipelines localmente.
-
 ---
 
-## 🚀 Criando um Novo Repositório?
+## Fluxo de Desenvolvimento
 
-**Siga nosso guia completo de setup para nascer com todas as melhores práticas:**
+### Modelo de Branches
 
-👉 **[Setup Completo de Novo Repositório Codebase](docs/tutorials/setup-novo-repositorio.md)** 👈
+| Branch | Propósito | Proteção |
+|--------|-----------|----------|
+| `sandbox` | Integração e homologação | ✅ Requer 1 aprovação |
+| `main` | Produção | ✅ Requer 2 aprovações |
 
-Este guia inclui:
-- ✅ Estrutura de branches (sandbox/main)
-- ✅ Workflows CI/CD completos
-- ✅ Proteção de branches configurada
-- ✅ Preview deploy opcional
-- ✅ Code review obrigatório
-- ✅ Templates de PR/Issue
-- ✅ Documentação básica
-
-**Tempo:** ~45 minutos | **Resultado:** Repositório production-ready
-
----
-
-## Fluxo Codebase
-
-### Fluxo de Desenvolvimento
+### Fluxo Padrão
 
 ```mermaid
 flowchart LR
@@ -72,23 +97,23 @@ flowchart LR
         D[RC Tag]
     end
 
-    subgraph RELEASE["📦 Release"]
-        E[GitHub Release]
+    subgraph RELEASE["📦 Release Candidate"]
+        E[Release]
         F[Artefato .zip]
     end
 
     subgraph PROD["🚀 Produção"]
         G[main]
         H[Prod Tag]
-        I[GitHub Release]
+        I[Release]
     end
 
-    A -->|PR + Review| B
+    A -->|MR/PR + Review| B
     B -->|Auto| C
     C -->|Validação OK| D
     D -->|Gera| E
     E --> F
-    D -->|PR + Aprovações| G
+    D -->|MR/PR + Aprovações| G
     G -->|Merge| H
     H -->|Gera| I
 
@@ -103,143 +128,64 @@ flowchart LR
     style I fill:#f4a261,stroke:#1d3557
 ```
 
-### Templates Disponíveis (GitHub Actions)
+### Ciclo de Vida Completo
 
-> Para GitLab CI/CD, consulte a [documentação GitLab](GITLAB.md).
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Dev as Desenvolvedor
+    participant FB as Feature Branch
+    participant SB as sandbox
+    participant RC as RC Tag
+    participant REL as Releases
+    participant MR as Merge/Pull Request
+    participant Main as main
 
-| Workflow | Descrição | Trigger |
-|----------|-----------|---------|
-| [`codebase-ci-node.yml`](.github/workflows/codebase-ci-node.yml) | Lint, testes e build para Node.js | Pull Requests |
-| [`codebase-ci-bun.yml`](.github/workflows/codebase-ci-bun.yml) | Lint, testes e build para Bun | Pull Requests |
-| [`codebase-release-node.yml`](.github/workflows/codebase-release-node.yml) | Gera artefatos e GitHub Release (Node.js) | Push de tags |
-| [`codebase-release-bun.yml`](.github/workflows/codebase-release-bun.yml) | Gera artefatos e GitHub Release (Bun) | Push de tags |
-| [`codebase-create-rc.yml`](.github/workflows/codebase-create-rc.yml) | Cria tag de Release Candidate | Manual |
-| [`codebase-qualify-rc.yml`](.github/workflows/codebase-qualify-rc.yml) | Qualifica RC como release de produção | Manual |
-| [`codebase-validate-tag.yml`](.github/workflows/codebase-validate-tag.yml) | Valida nomenclatura de tags | Push de tags |
-| [`codebase-preview-deploy.yml`](.github/workflows/codebase-preview-deploy.yml) | Preview deploy manual de PRs em sandbox | Manual (PRs) |
+    Dev->>FB: Cria branch feat/xxx
+    Dev->>FB: Desenvolve & Commits
+    FB->>SB: Abre MR/PR
+    Note over FB,SB: Code Review + CI
+    SB->>SB: Merge
+    Note over SB: Testes em Sandbox
 
-### Como Usar
+    Dev->>RC: Executa "Create RC"
+    RC->>REL: Tag v1.0.0-rc.1 + Release
+    Note over REL: Artefato disponível
 
-#### Projetos Node.js
-
-```yaml
-# .github/workflows/ci.yml
-name: CI
-on:
-  pull_request:
-    branches: [sandbox, main]
-jobs:
-  ci:
-    uses: iSmart-System/menura-actions/.github/workflows/codebase-ci-node.yml@main
-    with:
-      node-version: '20'
-      artifact-path: 'dist'  # Caminho do build
-      # upload-artifacts: false  # Opcional: desabilitar upload em PRs
-    secrets: inherit
+    Dev->>MR: Abre MR/PR para main
+    Note over MR,Main: Aprovações (2+)
+    Main->>Main: Merge
+    Main->>REL: Tag v1.0.0 + Release
+    Note over REL: Release de Produção
 ```
-
-#### Projetos Bun
-
-```yaml
-# .github/workflows/ci.yml
-name: CI
-on:
-  pull_request:
-    branches: [sandbox, main]
-jobs:
-  ci:
-    uses: iSmart-System/menura-actions/.github/workflows/codebase-ci-bun.yml@main
-    with:
-      bun-version: 'latest'
-      artifact-path: 'dist'  # Caminho do build
-      # upload-artifacts: false  # Opcional: desabilitar upload em PRs
-    secrets: inherit
-```
-
-```yaml
-# .github/workflows/release.yml (Node.js)
-name: Release
-on:
-  push:
-    tags: ['v*']
-jobs:
-  release:
-    uses: iSmart-System/menura-actions/.github/workflows/codebase-release-node.yml@main
-    with:
-      artifact-name: 'meu-projeto'
-      artifact-path: 'dist'
-    secrets: inherit
-```
-
-```yaml
-# .github/workflows/release.yml (Bun)
-name: Release
-on:
-  push:
-    tags: ['v*']
-jobs:
-  release:
-    uses: iSmart-System/menura-actions/.github/workflows/codebase-release-bun.yml@main
-    with:
-      artifact-name: 'meu-projeto'
-      artifact-path: 'dist'
-    secrets: inherit
-```
-
-### Preview Deploy em PRs (Opcional)
-
-Para habilitar preview deploy manual de PRs no ambiente sandbox:
-
-```yaml
-# .github/workflows/ci.yml
-on:
-  pull_request:
-    branches: [sandbox, main]
-
-jobs:
-  ci:
-    uses: iSmart-System/menura-actions/.github/workflows/codebase-ci-node.yml@main
-    with:
-      node-version: '20'
-      artifact-path: 'dist'
-    secrets: inherit
-
-  preview-deploy:
-    if: github.event_name == 'pull_request'
-    needs: ci
-    uses: iSmart-System/menura-actions/.github/workflows/codebase-preview-deploy.yml@main
-    with:
-      artifact-name: 'meu-app'
-      pr-number: ${{ github.event.pull_request.number }}
-      repository-name: 'meu-app'
-      branch-name: ${{ github.head_ref }}
-    secrets:
-      dispatch-token: ${{ secrets.PREVIEW_DEPLOY_TOKEN }}
-```
-
-> **Requisitos:** Environment `sandbox-preview` com required reviewers + Secret `PREVIEW_DEPLOY_TOKEN`
 
 ---
 
-## Branches e Tags
+## Versionamento SemVer
 
-### Branches
+### Formato de Tags
 
-| Branch | Propósito |
-|--------|-----------|
-| `sandbox` | Integração e homologação |
-| `main` | Produção |
+```
+v<MAJOR>.<MINOR>.<PATCH>[-rc.<RC_NUMBER>]
+```
 
-### Tags
+### Padrões
 
-| Padrão | Exemplo | Descrição |
-|--------|---------|-----------|
-| `v*.*.*-rc.*` | `v1.2.0-rc.1` | Release Candidate |
-| `v*.*.*` | `v1.2.0` | Release de Produção |
+| Padrão | Exemplo | Descrição | Branch |
+|--------|---------|-----------|--------|
+| `v*.*.*-rc.*` | `v1.2.0-rc.1` | Release Candidate | `sandbox` |
+| `v*.*.*` | `v1.2.0` | Release de Produção | `main` |
 
----
+### Quando Incrementar
 
-## Nomenclatura SemVer
+| Componente | Quando incrementar | Exemplo |
+|------------|-------------------|---------|
+| **MAJOR** | Breaking changes | `v1.0.0` → `v2.0.0` |
+| **MINOR** | Novas funcionalidades | `v1.0.0` → `v1.1.0` |
+| **PATCH** | Correções de bugs | `v1.0.0` → `v1.0.1` |
+| **RC** | Cada nova RC | `v1.0.0-rc.1` → `v1.0.0-rc.2` |
+
+### Exemplo de Fluxo de Versões
 
 ```mermaid
 gitGraph
@@ -259,66 +205,143 @@ gitGraph
     merge sandbox2 id: "v1.1.1" tag: "v1.1.1"
 ```
 
-```
-v<MAJOR>.<MINOR>.<PATCH>[-rc.<RC_NUMBER>]
-```
+---
 
-| Componente | Quando incrementar |
-|------------|-------------------|
-| **MAJOR** | Breaking changes |
-| **MINOR** | Novas funcionalidades |
-| **PATCH** | Correções |
-| **RC** | Cada nova RC |
+## Pipelines Padrão
+
+Independente da plataforma, todos os repositórios Codebase devem implementar:
+
+### CI (Continuous Integration)
+
+**Trigger:** MR/PR para `sandbox` ou `main`
+
+**Jobs:**
+1. **Lint** - Validação de código (ESLint, Prettier, etc)
+2. **Test** - Testes unitários e de integração
+3. **Build** - Compilação e geração de artefatos
+
+### Release Management
+
+**Jobs:**
+1. **Create RC** - Criar Release Candidate (manual, branch `sandbox`)
+2. **Qualify Release** - Qualificar RC para produção (manual, branch `main`)
+3. **Release** - Gerar artefatos e publicar release (automático ao criar tag)
+
+### Preview Deploy (Opcional)
+
+**Trigger:** Manual em MR/PR
+
+**Funcionalidade:**
+- Deploy temporário em ambiente sandbox
+- Aprovação manual nativa
+- Auto-cleanup após período configurado
 
 ---
 
-## Fluxo Completo de Desenvolvimento
+## Tech Stacks Suportadas
 
-```mermaid
-sequenceDiagram
-    autonumber
-    participant Dev as Desenvolvedor
-    participant FB as Feature Branch
-    participant SB as sandbox
-    participant RC as RC Tag
-    participant GHR as GitHub Releases
-    participant PR as Pull Request
-    participant Main as main
+| Stack | Status | Templates |
+|-------|--------|-----------|
+| **Node.js** | ✅ Suportado | CI, Release, Preview Deploy |
+| **Bun** | ✅ Suportado | CI, Release, Preview Deploy |
+| **Python** | 🔜 Planejado | - |
+| **Go** | 🔜 Planejado | - |
 
-    Dev->>FB: Cria branch feat/xxx
-    Dev->>FB: Desenvolve & Commits
-    FB->>SB: Abre PR
-    Note over FB,SB: Code Review + CI
-    SB->>SB: Merge
-    Note over SB: Testes em Sandbox
+---
 
-    Dev->>RC: Executa "Create RC"
-    RC->>GHR: Tag v1.0.0-rc.1 + Release
-    Note over GHR: Artefato disponível
+## Governança
 
-    Dev->>PR: Executa "Promote"
-    PR->>Main: PR automático
-    Note over PR,Main: Aprovações (2+)
-    Main->>Main: Merge
-    Main->>GHR: Tag v1.0.0 + Release
-    Note over GHR: Release de Produção
+### Proteção de Branches
+
+#### Branch `sandbox`
+- ✅ Requer MR/PR aprovado (1 reviewer)
+- ✅ Requer status checks passando
+- ✅ Requer branch atualizada
+
+#### Branch `main`
+- ✅ Requer MR/PR aprovado (2 reviewers)
+- ✅ Requer status checks passando
+- ✅ Requer branch atualizada
+- ✅ Apenas merge via MR/PR
+
+### Code Review
+
+- **Sandbox:** 1 aprovação mínima
+- **Main:** 2 aprovações mínimas
+- **Bloqueios:**
+  - Autor não pode aprovar próprio MR/PR
+  - Novas aprovações necessárias após novos commits
+
+### Secrets e Variáveis
+
+**Recomendações:**
+- Configurar secrets no nível de grupo/organização
+- Usar secrets protegidos para branches protegidas
+- Marcar secrets como "masked" para não aparecer em logs
+- **Não incluir secrets em código ou configurações**
+
+---
+
+## Convenções
+
+### Commits
+
+Seguimos [Conventional Commits](https://www.conventionalcommits.org/):
+
+```
+tipo(escopo): descrição
+
+Exemplos:
+feat(api): adicionar endpoint de autenticação
+fix(ui): corrigir layout responsivo
+docs(readme): atualizar instruções de setup
+refactor(core): simplificar lógica de validação
 ```
 
+### Branches
+
+| Tipo | Padrão | Exemplo |
+|------|--------|---------|
+| Feature | `feat/*` | `feat/user-authentication` |
+| Bugfix | `fix/*` | `fix/login-error` |
+| Hotfix | `hotfix/*` | `hotfix/critical-security-patch` |
+
 ---
 
-## Exemplos
+## Exemplos Práticos
 
-Exemplos prontos para copiar em seus projetos:
+### GitHub Actions
+```bash
+# Ver exemplos prontos
+examples/github/
+├── ci-node.yml                    # CI Node.js
+├── ci-bun.yml                     # CI Bun
+├── ci-with-preview-node.yml       # CI + Preview Deploy
+├── release-node.yml               # Release Node.js
+└── release-management.yml         # Release Management
+```
 
-- **GitHub Actions:** [`examples/github/`](examples/github/)
-- **GitLab CI/CD:** [`examples/gitlab/`](examples/gitlab/)
+📖 [Documentação completa GitHub Actions](examples/github/)
+
+### GitLab CI/CD
+```bash
+# Ver exemplos prontos
+examples/gitlab/
+├── ci-node.yml                    # CI Node.js
+├── ci-bun.yml                     # CI Bun
+├── ci-node-with-preview.yml       # CI + Preview Deploy
+└── ci-node-skip-tests.yml         # CI sem lint/tests
+```
+
+📖 [Documentação completa GitLab CI/CD](GITLAB.md)
 
 ---
 
-## Documentação
+## Documentação Adicional
 
 | Seção | Descrição |
 |-------|-----------|
+| [AGENTS.md](AGENTS.md) | Instruções para agentes de IA (Claude, Copilot, Cursor) |
 | [Tutorials](docs/tutorials/) | Guias de aprendizado passo-a-passo |
 | [How-To](docs/how-to/) | Guias práticos para tarefas específicas |
 | [Reference](docs/reference/) | Documentação técnica detalhada |
@@ -326,37 +349,37 @@ Exemplos prontos para copiar em seus projetos:
 
 ---
 
-## Configuração de Secrets
+## Migração entre Plataformas
 
-Na maioria dos casos, **nenhum secret adicional** é necessário! O `GITHUB_TOKEN` automático é suficiente.
+### GitHub → GitLab
 
-| Secret | Descrição | Quando Necessário |
-|--------|-----------|-------------------|
-| `GITHUB_TOKEN` | Token automático do GitHub Actions | **Sempre disponível** (não precisa configurar) |
-| `GH_TOKEN` | Personal Access Token | Opcional - apenas se PRs criados precisarem disparar workflows |
+Ver [Guia de Migração GitLab](GITLAB.md#migração-do-github-actions)
 
-> **Sobre secrets de deploy:** O menura-actions **não gerencia deploy**. Secrets como AWS, Vercel, databases, etc. devem ser configurados nos repositórios Architecture Live (Terragrunt).
+**Principais diferenças:**
+- `workflow_call` → `include` + `extends`
+- `actions/checkout` → Automático
+- Aprovação manual → Nativa (`when: manual`)
+
+### GitLab → GitHub
+
+**Principais diferenças:**
+- `include` + `extends` → `workflow_call`
+- Aprovação manual → Requer action de terceiros ou environments
 
 ---
 
-## Configuração de Proteção de Branches
+## Suporte
 
-### Branch `sandbox`
+### Issues e Melhorias
+- **GitHub:** [iSmart-System/menura-actions/issues](https://github.com/iSmart-System/menura-actions/issues)
+- **GitLab:** [m3nura/pipelines/issues](https://gitlab.com/m3nura/pipelines/-/issues)
 
-```
-Require pull request reviews (1 reviewer)
-Require status checks to pass
-Require branches to be up to date
-```
-
-### Branch `main`
-
-```
-Require pull request reviews (2 reviewers)
-Require status checks to pass
-Require branches to be up to date
-Restrict who can push (apenas via PR)
-```
+### Contribuindo
+1. Fork o repositório
+2. Crie branch `feat/*` ou `fix/*`
+3. Faça commits seguindo Conventional Commits
+4. Abra MR/PR para `sandbox`
+5. Aguarde code review
 
 ---
 
