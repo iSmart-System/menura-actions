@@ -1,10 +1,16 @@
-# Menura Actions
+# Menura Pipelines
 
 Repositório central de governança de pipelines CI/CD para repositórios **Codebase** da organização Menura.
 
+**Suporte multi-plataforma:** GitHub Actions e GitLab CI/CD
+
 ## Visão Geral
 
-O menura-actions fornece workflows reutilizáveis para repositórios que contêm código fonte de aplicações.
+O menura-pipelines fornece templates reutilizáveis de CI/CD para repositórios que contêm código fonte de aplicações, com suporte para **GitHub Actions** e **GitLab CI/CD**.
+
+**📚 Documentação Específica:**
+- [GitHub Actions](examples/github/) - Workflows para GitHub
+- [GitLab CI/CD](GITLAB.md) - Pipelines para GitLab
 
 ```mermaid
 flowchart TB
@@ -97,7 +103,9 @@ flowchart LR
     style I fill:#f4a261,stroke:#1d3557
 ```
 
-### Workflows Disponíveis
+### Templates Disponíveis (GitHub Actions)
+
+> Para GitLab CI/CD, consulte a [documentação GitLab](GITLAB.md).
 
 | Workflow | Descrição | Trigger |
 |----------|-----------|---------|
@@ -300,7 +308,10 @@ sequenceDiagram
 
 ## Exemplos
 
-Veja a pasta [`examples/codebase-project/`](examples/codebase-project/) para workflows prontos para copiar em seus projetos.
+Exemplos prontos para copiar em seus projetos:
+
+- **GitHub Actions:** [`examples/github/`](examples/github/)
+- **GitLab CI/CD:** [`examples/gitlab/`](examples/gitlab/)
 
 ---
 

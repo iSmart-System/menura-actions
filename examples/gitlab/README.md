@@ -26,6 +26,31 @@ Exemplos práticos de como usar os templates do `m3nura/pipelines`.
    - Settings → CI/CD → Variables
    - Adicione `PREVIEW_DEPLOY_TOKEN` (se usar preview deploy)
 
+## Como Funciona o Include
+
+O `m3nura/pipelines` usa **includes diretos** (best practice):
+
+```yaml
+# Incluir arquivo específico
+include:
+  - project: 'm3nura/pipelines'
+    ref: main
+    file: '.gitlab/ci/codebase-ci-node.yml'
+
+# Incluir múltiplos arquivos (GitLab 13.6+)
+include:
+  - project: 'm3nura/pipelines'
+    ref: main
+    file:
+      - '.gitlab/ci/codebase-ci-node.yml'
+      - '.gitlab/deploy/codebase-preview-deploy.yml'
+```
+
+**Vantagens:**
+- Incluir apenas o que você precisa
+- Evita carregar templates desnecessários
+- Melhor performance e clareza
+
 ## Customizações Comuns
 
 ### Pular Stages Específicos
@@ -86,7 +111,7 @@ preview:
 include:
   - project: 'm3nura/pipelines'
     ref: main
-    file: '/.gitlab-ci.yml'
+    file: '.gitlab/ci/codebase-ci-node.yml'
 
 stages:
   - test
@@ -112,7 +137,9 @@ build:
 include:
   - project: 'm3nura/pipelines'
     ref: main
-    file: '/.gitlab-ci.yml'
+    file:
+      - '.gitlab/ci/codebase-ci-node.yml'
+      - '.gitlab/deploy/codebase-preview-deploy.yml'
 
 stages:
   - test
@@ -148,7 +175,9 @@ stop_preview:
 include:
   - project: 'm3nura/pipelines'
     ref: main
-    file: '/.gitlab-ci.yml'
+    file:
+      - '.gitlab/ci/codebase-ci-node.yml'
+      - '.gitlab/deploy/codebase-preview-deploy.yml'
 
 stages:
   - build
@@ -201,8 +230,10 @@ Após configurar, verifique:
   include:
     - project: 'm3nura/pipelines'
       ref: main
-      file: '/.gitlab-ci.yml'
+      file: '.gitlab/ci/codebase-ci-node.yml'  # Caminho específico do template
   ```
+- Verifique se você tem acesso ao projeto `m3nura/pipelines`
+- Confirme que a branch `main` existe no repositório de pipelines
 
 ### Preview deploy não aparece
 
@@ -214,5 +245,7 @@ Após configurar, verifique:
 ## Links Úteis
 
 - [Documentação completa](../../GITLAB.md)
-- [Templates principais](../../.gitlab-ci.yml)
+- [Templates CI](../../.gitlab/ci/)
+- [Templates Deploy](../../.gitlab/deploy/)
+- [Templates Release](../../.gitlab/release/)
 - [GitLab CI/CD Docs](https://docs.gitlab.com/ee/ci/)

@@ -16,13 +16,14 @@ m3nura/
 
 ### 1. Incluir Templates no Seu Projeto
 
-Crie `.gitlab-ci.yml` na raiz do seu projeto:
+Crie `.gitlab-ci.yml` na raiz do seu projeto com **includes diretos** dos arquivos específicos:
 
 ```yaml
 include:
+  # Include DIRETO dos arquivos específicos (best practice!)
   - project: 'm3nura/pipelines'
     ref: main
-    file: '/.gitlab-ci.yml'
+    file: '.gitlab/ci/codebase-ci-node.yml'
 
 stages:
   - test
@@ -48,6 +49,23 @@ preview:
   variables:
     ARTIFACT_NAME: "meu-app"
 ```
+
+**Múltiplos arquivos** (GitLab 13.6+):
+
+```yaml
+include:
+  - project: 'm3nura/pipelines'
+    ref: main
+    file:
+      - '.gitlab/ci/codebase-ci-node.yml'
+      - '.gitlab/deploy/codebase-preview-deploy.yml'
+```
+
+**Vantagens:**
+- ✅ Incluir apenas o que você precisa
+- ✅ Evita carregar templates desnecessários
+- ✅ Melhor performance e clareza
+- ✅ Não precisa de arquivo index na raiz
 
 ### 2. Templates Disponíveis
 
@@ -162,7 +180,7 @@ Require new approvals when new commits: ✅
 include:
   - project: 'm3nura/pipelines'
     ref: main
-    file: '/.gitlab-ci.yml'
+    file: '.gitlab/ci/codebase-ci-node.yml'
 
 stages:
   - test
@@ -187,7 +205,9 @@ build:
 include:
   - project: 'm3nura/pipelines'
     ref: main
-    file: '/.gitlab-ci.yml'
+    file:
+      - '.gitlab/ci/codebase-ci-node.yml'
+      - '.gitlab/deploy/codebase-preview-deploy.yml'
 
 stages:
   - test
@@ -225,7 +245,9 @@ stop_preview:
 include:
   - project: 'm3nura/pipelines'
     ref: main
-    file: '/.gitlab-ci.yml'
+    file:
+      - '.gitlab/ci/codebase-ci-node.yml'
+      - '.gitlab/deploy/codebase-preview-deploy.yml'
 
 stages:
   - build
@@ -297,12 +319,16 @@ sudo gitlab-runner start
 
 ### Job não encontra template
 
-**Erro:** `Include file '/.gitlab-ci.yml' does not exist`
+**Erro:** `Include file '.gitlab/ci/codebase-ci-node.yml' does not exist`
 
 **Solução:**
 1. Verifique se o projeto `m3nura/pipelines` existe
-2. Verifique se você tem acesso ao projeto
-3. Confirme que o arquivo `.gitlab-ci.yml` está na raiz
+2. Verifique se você tem acesso ao projeto (visibilidade)
+3. Confirme que o caminho do arquivo está correto:
+   - `.gitlab/ci/codebase-ci-node.yml` para templates Node.js
+   - `.gitlab/ci/codebase-ci-bun.yml` para templates Bun
+   - `.gitlab/deploy/codebase-preview-deploy.yml` para preview deploy
+4. Verifique se a branch `main` existe no repositório de pipelines
 
 ### Preview deploy não dispara
 
@@ -325,7 +351,9 @@ sudo gitlab-runner start
 ## Links Úteis
 
 - [GitLab CI/CD Docs](https://docs.gitlab.com/ee/ci/)
-- [Template de pipelines](/.gitlab-ci.yml)
+- [Templates CI](./.gitlab/ci/)
+- [Templates Deploy](./.gitlab/deploy/)
+- [Templates Release](./.gitlab/release/)
 - [Exemplos](./examples/gitlab/)
 - [Migração do GitHub Actions](https://docs.gitlab.com/ee/ci/migration/github_actions.html)
 

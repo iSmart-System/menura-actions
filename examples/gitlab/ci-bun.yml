@@ -6,43 +6,29 @@
 # =============================================================================
 
 include:
-  # Incluir templates do repositório de pipelines
+  # Include DIRETO do arquivo específico para Bun
   - project: 'm3nura/pipelines'
     ref: main
-    file: '/.gitlab-ci.yml'
+    file: '.gitlab/ci/codebase-ci-bun.yml'
 
 # Definir stages
 stages:
   - test
   - build
-  - deploy
 
 # Definir variáveis do projeto
 variables:
   BUN_VERSION: "latest"
   ARTIFACT_PATH: "dist"
 
-# Job de lint
+# Job de lint (estende template do arquivo incluído)
 lint:
   extends: .bun-lint
 
-# Job de testes
+# Job de testes (estende template do arquivo incluído)
 test:
   extends: .bun-test
 
-# Job de build
+# Job de build (estende template do arquivo incluído)
 build:
   extends: .bun-build
-
-# Job de preview deploy (manual)
-preview:
-  extends: .preview-deploy
-  variables:
-    ARTIFACT_NAME: "meu-app"  # Nome do seu projeto
-  needs:
-    - job: build
-      artifacts: true
-
-# Job de cleanup do preview
-stop_preview:
-  extends: .stop-preview

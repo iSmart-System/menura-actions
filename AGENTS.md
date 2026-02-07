@@ -88,14 +88,22 @@ jobs:
 
 **Como funciona:**
 ```yaml
-# Projeto consome assim:
+# Projeto consome assim (include direto, best practice):
 include:
   - project: 'm3nura/pipelines'
     ref: main
-    file: '/.gitlab-ci.yml'
+    file: '.gitlab/ci/codebase-ci-node.yml'
 
 lint:
   extends: .node-lint
+
+# Para múltiplos arquivos (GitLab 13.6+):
+include:
+  - project: 'm3nura/pipelines'
+    ref: main
+    file:
+      - '.gitlab/ci/codebase-ci-node.yml'
+      - '.gitlab/deploy/codebase-preview-deploy.yml'
 ```
 
 **Características:**
@@ -103,6 +111,7 @@ lint:
 - Funciona out-of-the-box em repos privados
 - Aprovação manual nativa (`when: manual`)
 - Environments avançados (histórico, rollback)
+- Include direto de arquivos específicos (sem index file)
 
 ## Build & Test Commands
 
@@ -401,7 +410,7 @@ uses: iSmart-System/menura-actions/.github/workflows/codebase-ci-node.yml@sua-br
 include:
   - project: 'm3nura/pipelines'
     ref: sua-branch
-    file: '/.gitlab-ci.yml'
+    file: '.gitlab/ci/codebase-ci-node.yml'
 ```
 
 ### Migrar Feature entre Plataformas
