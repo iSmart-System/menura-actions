@@ -37,6 +37,8 @@ jobs:
     secrets:
       dispatch-token: ${{ secrets.PREVIEW_DEPLOY_TOKEN }}
 
-    # IMPORTANTE: Configure o Environment "sandbox-preview" no GitHub
-    # Settings > Environments > New environment > "sandbox-preview"
-    # Adicione required reviewers para aprovação manual
+    # GOVERNANÇA CENTRALIZADA (Organization Variables):
+    # 1. PREVIEW_DEPLOY_APPROVERS: Lista de aprovadores (ex: user1,user2)
+    # 2. PREVIEW_DEPLOY_MINIMUM_APPROVALS: Número mínimo de aprovações (padrão: 2)
+    # 3. Apenas admins da org podem atualizar essas variables (segurança)
+    # 4. Repositórios NÃO podem sobrescrever (governança)

@@ -26,11 +26,11 @@ on:
         description: 'Nome da branch'
         required: true
         type: string
-      environment:
-        description: 'Nome do environment GitHub para aprovação'
+      issue-title:
+        description: 'Título da issue de aprovação'
         required: false
         type: string
-        default: 'sandbox-preview'
+        default: '🚀 Aprovação de Preview Deploy'
       foundation-repo:
         description: 'Repositório de infraestrutura (owner/repo)'
         required: false
@@ -45,7 +45,9 @@ jobs:
   trigger-preview-deploy:
     name: Trigger Preview Deploy
     runs-on: ubuntu-latest
-    environment: ${{ inputs.environment }}
+    permissions:
+      issues: write
+      contents: read
 
     steps:
       - name: Validar inputs
@@ -63,6 +65,33 @@ jobs:
           fi
 
           echo "✅ Inputs válidos"
+
+      - name: Definir configurações de aprovação
+        id: approval-config
+        run: |
+          # Usa SEMPRE as variables da organização (governança centralizada)
+          APPROVERS="${{ vars.PREVIEW_DEPLOY_APPROVERS }}"
+          MIN_APPROVALS="${{ vars.PREVIEW_DEPLOY_MINIMUM_APPROVALS }}"
+
+          # Validar aprovadores
+          if [[ -z "$APPROVERS" ]]; then
+            echo "::error::PREVIEW_DEPLOY_APPROVERS não configurada na organização!"
+            echo "::error::Configure com: gh variable set PREVIEW_DEPLOY_APPROVERS --org iSmart-System --body 'user1,user2' --visibility all"
+            exit 1
+          fi
+
+          # Validar mínimo de aprovações
+          if [[ -z "$MIN_APPROVALS" ]]; then
+            echo "::error::PREVIEW_DEPLOY_MINIMUM_APPROVALS não configurada na organização!"
+            echo "::error::Configure com: gh variable set PREVIEW_DEPLOY_MINIMUM_APPROVALS --org iSmart-System --body '2' --visibility all"
+            exit 1
+          fi
+
+          echo "📋 Aprovadores da organização: $APPROVERS"
+          echo "🔢 Mínimo de aprovações: $MIN_APPROVALS"
+
+          echo "approvers=$APPROVERS" >> $GITHUB_OUTPUT
+          echo "minimum-approvals=$MIN_APPROVALS" >> $GITHUB_OUTPUT
 
       - name: Preparar metadata
         id: metadata
@@ -82,6 +111,48 @@ jobs:
 
           echo "📦 Artefato efêmero: $EPHEMERAL_ARTIFACT"
           echo "🔗 Preview ID: $PREVIEW_ID"
+
+      - name: Aguardar Aprovação Manual
+        uses: trstringer/manual-approval@v1
+        timeout-minutes: 60
+        with:
+          secret: ${{ github.token }}
+          approvers: ${{ steps.approval-config.outputs.approvers }}
+          minimum-approvals: ${{ steps.approval-config.outputs.minimum-approvals }}
+          issue-title: ${{ inputs.issue-title }}
+          issue-body: |
+            ## 🚀 Solicitação de Preview Deploy
+
+            **PR #${{ inputs.pr-number }}** está solicitando deploy de preview no ambiente sandbox.
+
+            ### 📋 Detalhes
+            - **Repositório:** `${{ github.repository }}`
+            - **Branch:** `${{ inputs.branch-name }}`
+            - **Commit:** `${{ github.sha }}`
+            - **Artefato:** `${{ steps.metadata.outputs.ephemeral-artifact }}`
+            - **Preview ID:** `${{ steps.metadata.outputs.preview-id }}`
+            - **Solicitado por:** @${{ github.actor }}
+
+            ### 🔐 Aprovação Necessária
+
+            Para **aprovar** este preview deploy, comente:
+            ```
+            approved
+            ```
+
+            Para **negar** este preview deploy, comente:
+            ```
+            denied
+            ```
+
+            ---
+
+            ⏱️ **Timeout:** 60 minutos
+            👥 **Aprovações necessárias:** ${{ steps.approval-config.outputs.minimum-approvals }}
+            ✅ **Aprovadores:** ${{ steps.approval-config.outputs.approvers }}
+
+            🔗 [Ver PR #${{ inputs.pr-number }}](https://github.com/${{ github.repository }}/pull/${{ inputs.pr-number }})
+            🔗 [Ver Workflow Run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
 
       - name: Trigger Infrastructure Deploy
         uses: peter-evans/repository-dispatch@v3

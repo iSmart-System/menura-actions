@@ -322,7 +322,7 @@ jobs:
 | `pr-number` | string | **sim** | - | Número do Pull Request |
 | `repository-name` | string | **sim** | - | Nome do repositório para identificação |
 | `branch-name` | string | **sim** | - | Nome da branch |
-| `environment` | string | não | `'sandbox-preview'` | Nome do environment GitHub para aprovação |
+| `issue-title` | string | não | `'🚀 Aprovação de Preview Deploy'` | Título da issue de aprovação |
 | `foundation-repo` | string | não | `'iSmart-System/menura-cloud-foundation'` | Repositório de infraestrutura |
 
 ### Secrets
@@ -336,9 +336,9 @@ jobs:
 1. **trigger-preview-deploy** - Dispara deploy no repositório de infraestrutura
    - Valida inputs
    - Prepara metadata (artifact name efêmero, preview ID)
+   - **Aguarda aprovação manual via GitHub Issue** (timeout: 60min)
    - Envia `repository_dispatch` event para `menura-cloud-foundation`
    - Comenta no PR com detalhes do deploy
-   - Requer aprovação manual via GitHub Environment
 
 ### Payload Enviado
 
@@ -379,16 +379,27 @@ jobs:
       pr-number: ${{ github.event.pull_request.number }}
       repository-name: 'meu-app'
       branch-name: ${{ github.head_ref }}
+      approvers: 'user1,user2,user3'
+      minimum-approvals: 1
     secrets:
       dispatch-token: ${{ secrets.PREVIEW_DEPLOY_TOKEN }}
 ```
 
 ### Requisitos
 
-- GitHub Environment `sandbox-preview` configurado com required reviewers
 - PAT com scope `repo` e write access ao `menura-cloud-foundation`
-- Secret `PREVIEW_DEPLOY_TOKEN` configurado no repositório
+- Secret `PREVIEW_DEPLOY_TOKEN` configurado (organization ou repo)
+- **Organization Variables configuradas:**
+  - `PREVIEW_DEPLOY_APPROVERS`: Lista de aprovadores (já configurada: `nychollas09,YtaloCampos`)
+  - `PREVIEW_DEPLOY_MINIMUM_APPROVALS`: Mínimo de aprovações (já configurada: `2`)
 - Workflow no `menura-cloud-foundation` escutando evento `preview-deploy`
+- **Funciona no plano Free do GitHub** (aprovação via issues)
+
+> **Governança:** As variáveis de aprovação são **centralizadas** na organização e **não podem ser sobrescritas** por repositórios individuais. Apenas admins da org podem atualizar.
+>
+> **Atualizar aprovadores:** `gh variable set PREVIEW_DEPLOY_APPROVERS --org iSmart-System --body "user1,user2" --visibility all`
+>
+> **Atualizar mínimo:** `gh variable set PREVIEW_DEPLOY_MINIMUM_APPROVALS --org iSmart-System --body "2" --visibility all`
 
 ---
 

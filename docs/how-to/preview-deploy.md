@@ -13,6 +13,7 @@ sequenceDiagram
     participant PR as Pull Request
     participant CI as CI Pipeline
     participant Preview as Preview Deploy Job
+    participant Issue as GitHub Issue
     participant Foundation as menura-cloud-foundation
     participant Sandbox as Sandbox Environment
 
@@ -20,8 +21,12 @@ sequenceDiagram
     PR->>CI: Dispara CI Pipeline
     CI->>CI: Build + Tests + Lint
     CI->>CI: Upload Artefato
-    Note over Preview: Job aguarda aprovação manual
-    Dev->>Preview: Aprova Preview Deploy
+    Preview->>Issue: Cria Issue de Aprovação
+    Issue->>Dev: Notifica Aprovadores
+    Note over Preview: Job aguarda aprovação (60min)
+    Dev->>Issue: Comenta "approved"
+    Issue->>Preview: Aprovação recebida
+    Preview->>Issue: Fecha Issue automaticamente
     Preview->>Foundation: Repository Dispatch
     Foundation->>Sandbox: Deploy Efêmero
     Foundation->>PR: Comenta URL do Preview
@@ -58,17 +63,36 @@ No repositório do projeto:
 3. **Name:** `PREVIEW_DEPLOY_TOKEN`
 4. **Secret:** Cole o PAT criado
 
-### 3. Criar Environment com Aprovação Manual
+### 3. Configurar Aprovadores
 
-1. Settings → Environments → New environment
-2. **Name:** `sandbox-preview`
-3. Configure deployment protection rules:
-   - ✅ Required reviewers
-   - Adicione usuários/times que podem aprovar
-   - (Opcional) ✅ Prevent self-review
-4. Save protection rules
+**Para Plano Free (Repos Privados):**
 
-> **Nota:** Required reviewers requer GitHub Pro/Team/Enterprise para repos privados. Para repos públicos, está disponível no free tier.
+A aprovação é feita via **GitHub Issues** automaticamente (funciona no plano Free).
+
+**A organização `iSmart-System` tem governança configurada centralmente:**
+
+```bash
+# Variables configuradas na organização (governança centralizada)
+PREVIEW_DEPLOY_APPROVERS=nychollas09,YtaloCampos
+PREVIEW_DEPLOY_MINIMUM_APPROVALS=2
+```
+
+**Como funciona:**
+
+1. Os aprovadores e mínimo de aprovações são definidos **exclusivamente** nas Organization Variables
+2. **TODOS** os repositórios usam automaticamente essas configurações (sem possibilidade de sobrescrever)
+3. Quando preview deploy é solicitado, uma **issue é criada automaticamente**
+4. Aprovadores comentam `approved` ou `denied` na issue
+5. O workflow continua após **2 aprovações** (mínimo configurado)
+
+**Governança e Segurança:**
+
+✅ **Centralizado** - Única fonte de verdade para configurações de aprovação
+✅ **Seguro** - Repositórios não podem contornar aprovação ou reduzir mínimo
+✅ **Auditável** - Mudanças nas variables são rastreadas
+✅ **Controlado** - Apenas admins da org podem atualizar
+
+> **Nota:** Esta abordagem funciona em **qualquer plano do GitHub** (incluindo Free) para repositórios privados.
 
 ## Configuração do Workflow
 
@@ -146,12 +170,22 @@ A pipeline de CI executará automaticamente:
 
 Após o CI passar:
 
-1. Acesse a aba **Actions** do PR
-2. Localize o job "Preview Deploy (Manual)"
-3. Status: **Waiting** (aguardando aprovação)
-4. Clique em **Review deployments**
-5. Selecione `sandbox-preview`
-6. Clique em **Approve and deploy**
+1. Uma **issue será criada automaticamente** solicitando aprovação
+2. A issue será atribuída aos aprovadores configurados
+3. Você receberá uma **notificação** da issue
+4. Acesse a issue e leia os detalhes do preview deploy
+5. Para **aprovar**, comente na issue:
+   ```
+   approved
+   ```
+6. Para **negar**, comente na issue:
+   ```
+   denied
+   ```
+7. O workflow continuará após aprovação ou falhará se negado
+8. A issue será **fechada automaticamente** após a decisão
+
+> **Timeout:** O workflow aguarda até 60 minutos por aprovação (configurável)
 
 ### 4. Acompanhar Deploy
 
@@ -176,13 +210,58 @@ Quando o PR for:
 
 ## Opções Avançadas
 
-### Customizar Environment Name
+### Atualizar Configurações de Governança
+
+⚠️ **Apenas admins da organização podem atualizar** (governança centralizada)
+
+**Atualizar lista de aprovadores:**
+
+```bash
+# Atualizar variable da organização (requer permissão admin:org)
+gh variable set PREVIEW_DEPLOY_APPROVERS \
+  --org iSmart-System \
+  --body "user1,user2,user3,user4" \
+  --visibility all
+```
+
+**Dica:** Mantenha sincronizado com o team `root`:
+
+```bash
+# Listar membros do team root
+gh api /orgs/iSmart-System/teams/root/members --jq '.[].login' | tr '\n' ',' | sed 's/,$//'
+
+# Copiar output e atualizar a variable
+```
+
+**Atualizar mínimo de aprovações:**
+
+```bash
+# Atualizar mínimo de aprovações (requer permissão admin:org)
+gh variable set PREVIEW_DEPLOY_MINIMUM_APPROVALS \
+  --org iSmart-System \
+  --body "2" \
+  --visibility all
+```
+
+**Verificar configurações:**
+
+```bash
+gh variable list --org iSmart-System | grep PREVIEW_DEPLOY
+```
+
+> **Importante:** Repositórios individuais **NÃO podem** sobrescrever essas configurações. Isso é intencional para manter governança e segurança centralizadas.
+
+### Customizar Timeout de Aprovação
+
+O timeout padrão é 60 minutos. Não é configurável via inputs (limitação do GitHub Actions), mas pode ser ajustado editando o workflow diretamente se necessário.
+
+### Customizar Mensagem da Issue
 
 ```yaml
 preview-deploy:
   uses: iSmart-System/menura-actions/.github/workflows/codebase-preview-deploy.yml@main
   with:
-    environment: 'sandbox-preview-staging'  # Custom environment
+    issue-title: '🚀 [URGENTE] Aprovação de Preview Deploy Produção'
     # ... outros inputs
 ```
 
@@ -196,27 +275,18 @@ preview-deploy:
     # ... outros inputs
 ```
 
-### Deploy Automático (Sem Aprovação)
-
-Remova o environment ou crie um environment sem required reviewers:
-
-```yaml
-preview-deploy:
-  uses: iSmart-System/menura-actions/.github/workflows/codebase-preview-deploy.yml@main
-  with:
-    environment: 'sandbox-preview-auto'  # Environment sem reviewers
-    # ... outros inputs
-```
-
 ## Troubleshooting
 
 | Problema | Causa | Solução |
 |----------|-------|---------|
 | Job não aparece | `if: github.event_name == 'pull_request'` | Verifique se está em um PR |
-| Erro de permissão | PAT sem permissões | Verifique scopes do PAT |
-| Não pede aprovação | Environment sem reviewers | Configure required reviewers |
+| Issue não é criada | Falta permissão `issues: write` | Workflow já tem, verifique token |
+| Aprovadores não notificados | Usernames incorretos | Verifique usernames no input `approvers` |
+| Timeout após 60min | Ninguém aprovou | Reduza timeout ou aprove mais rápido |
+| Erro ao criar issue | Problemas com GITHUB_TOKEN | Use `secrets: inherit` no workflow |
 | Deploy não dispara | Secret não configurado | Adicione `PREVIEW_DEPLOY_TOKEN` |
-| Artefato não encontrado | `upload-artifacts: false` | Altere para `true` |
+| Artefato não encontrado | `upload-artifacts: false` | Altere para `true` no CI |
+| Workflow continua sem aprovação | Comentário incorreto | Use exatamente `approved` (minúsculo) |
 
 ## Payload Enviado ao Foundation
 
@@ -276,11 +346,12 @@ jobs:
 ## Segurança
 
 - ✅ PAT com minimal scope (apenas foundation repo)
-- ✅ Required reviewers no environment
-- ✅ Self-review prevention habilitado
+- ✅ Aprovação manual via issue (apenas aprovadores podem aprovar)
+- ✅ Audit trail completo via issues e workflow logs
 - ✅ Validação de inputs antes do dispatch
 - ✅ Secrets via GitHub Secrets (nunca hardcoded)
-- ✅ Audit log via GitHub Actions logs
+- ✅ Timeout configurável para prevenir workflows órfãos
+- ✅ Lista explícita de aprovadores (controle de acesso)
 
 ---
 
