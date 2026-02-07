@@ -5,21 +5,22 @@
 
 ## Project Overview
 
-Este é o **menura-actions**, repositório central de governança de pipelines CI/CD para repositórios **Codebase** da organização Menura (iSmart-System). Contém workflows reutilizáveis do GitHub Actions para repositórios que contêm código fonte de aplicações.
+Este é o **menura-pipelines** (anteriormente menura-actions), repositório central de governança de pipelines CI/CD para repositórios **Codebase** da organização Menura. Contém templates reutilizáveis para **GitHub Actions** e **GitLab CI/CD**.
 
 ### Propósito
 
 - Padronizar pipelines de CI/CD para repositórios Codebase
 - Automatizar gestão de releases e tags
 - Garantir governança e qualidade nas releases
-- Gerar artefatos (.zip) e publicar no GitHub Releases
+- Gerar artefatos e publicar releases
+- **Suporte multi-plataforma:** GitHub Actions E GitLab CI/CD
 
 > **Nota:** Repositórios de infraestrutura (Terraform/Terragrunt) mantêm suas próprias pipelines localmente.
 
 ### Stack Técnica
 
-- **Plataforma:** GitHub Actions
-- **Linguagem:** YAML (workflows), Bash (scripts)
+- **Plataformas:** GitHub Actions + GitLab CI/CD
+- **Linguagem:** YAML (workflows/pipelines), Bash (scripts)
 - **Padrão de Versionamento:** SemVer (vX.Y.Z)
 - **Branches:** `sandbox` (staging), `main` (production)
 - **Tech Stacks Suportadas:** Node.js, Bun
@@ -27,29 +28,85 @@ Este é o **menura-actions**, repositório central de governança de pipelines C
 ## Project Structure
 
 ```
-menura-actions/
-├── .github/
-│   └── workflows/
-│       ├── codebase-ci-node.yml           # CI para projetos Node.js
-│       ├── codebase-ci-bun.yml            # CI para projetos Bun
-│       ├── codebase-release-node.yml      # Gera artefatos e GitHub Release (Node.js)
-│       ├── codebase-release-bun.yml       # Gera artefatos e GitHub Release (Bun)
-│       ├── codebase-create-rc.yml         # Cria tags de Release Candidate
-│       ├── codebase-qualify-rc.yml           # Qualifica RC como release de produção
-│       └── codebase-validate-tag.yml      # Valida nomenclatura de tags
+m3nura/pipelines/
+├── .github/workflows/          # GitHub Actions workflows
+│   ├── codebase-ci-node.yml
+│   ├── codebase-ci-bun.yml
+│   ├── codebase-preview-deploy.yml
+│   └── ...
+├── .gitlab/                    # GitLab CI/CD pipelines
+│   ├── ci/
+│   │   ├── codebase-ci-node.yml
+│   │   └── codebase-ci-bun.yml
+│   ├── deploy/
+│   │   └── codebase-preview-deploy.yml
+│   └── release/
+│       ├── create-rc.yml
+│       └── qualify-release.yml
 ├── docs/
-│   ├── tutorials/                         # Guias de aprendizado passo-a-passo
-│   ├── how-to/                            # Guias práticos para tarefas específicas
-│   ├── reference/                         # Documentação técnica detalhada
-│   └── explanation/                       # Conceitos e arquitetura
+│   ├── tutorials/              # Guias de aprendizado passo-a-passo
+│   ├── how-to/                 # Guias práticos para tarefas específicas
+│   ├── reference/              # Documentação técnica detalhada
+│   └── explanation/            # Conceitos e arquitetura
 ├── examples/
-│   └── codebase-project/                  # Exemplos para copiar nos projetos
-├── .gitignore
-├── AGENTS.md                              # Este arquivo
-└── README.md                              # Documentação principal
+│   ├── github/                 # Exemplos GitHub Actions
+│   └── gitlab/                 # Exemplos GitLab CI/CD
+├── .gitlab-ci.yml              # Index de templates GitLab
+├── GITLAB.md                   # Documentação GitLab
+├── AGENTS.md                   # Este arquivo
+└── README.md                   # Documentação principal (agnóstica)
 ```
 
+## Multi-Platform Support
+
+Este repositório suporta **DUAS plataformas de CI/CD** com templates equivalentes:
+
+### GitHub Actions
+
+**Localização:** `.github/workflows/`
+
+**Como funciona:**
+```yaml
+# Projeto consome assim:
+jobs:
+  ci:
+    uses: iSmart-System/menura-actions/.github/workflows/codebase-ci-node.yml@main
+    with:
+      node-version: '20'
+    secrets: inherit
+```
+
+**Características:**
+- Usa `workflow_call` para reutilização
+- Requer configuração de permissões para repos privados
+- Preview deploy via actions de terceiros
+- Environments com proteção via required reviewers
+
+### GitLab CI/CD
+
+**Localização:** `.gitlab/`
+
+**Como funciona:**
+```yaml
+# Projeto consome assim:
+include:
+  - project: 'm3nura/pipelines'
+    ref: main
+    file: '/.gitlab-ci.yml'
+
+lint:
+  extends: .node-lint
+```
+
+**Características:**
+- Usa `include` + `extends` para reutilização
+- Funciona out-of-the-box em repos privados
+- Aprovação manual nativa (`when: manual`)
+- Environments avançados (histórico, rollback)
+
 ## Build & Test Commands
+
+### GitHub Actions
 
 ```bash
 # Validar syntax YAML dos workflows
@@ -59,67 +116,105 @@ yamllint .github/workflows/
 act -l                                # Listar workflows
 act -j <job-name>                     # Executar job específico
 act push                              # Simular evento push
-act workflow_dispatch                 # Simular dispatch manual
 
 # Verificar erros de formatação
-prettier --check "**/*.yml"
+prettier --check ".github/workflows/*.yml"
+```
+
+### GitLab CI/CD
+
+```bash
+# Validar syntax YAML das pipelines
+yamllint .gitlab/
+
+# Validar via GitLab CI Lint (requer projeto GitLab)
+# Acesse: https://gitlab.com/m3nura/pipelines/-/ci/lint
+
+# Testar localmente (requer gitlab-runner)
+gitlab-runner exec docker <job-name>
+
+# Verificar erros de formatação
+prettier --check ".gitlab/**/*.yml"
 ```
 
 ## Code Style Guidelines
 
-### YAML
+### YAML (Ambas Plataformas)
 
 ```yaml
 # Indentar com 2 espaços
 # Usar aspas simples para strings quando necessário
 # Comentários em português, explicativos
 
+# GitHub Actions
 name: Nome do Workflow
-
 on:
   workflow_call:
     inputs:
       exemplo:
-        description: 'Descrição clara do input'
+        description: 'Descrição clara'
         required: false
         type: string
         default: 'valor-padrao'
+
+# GitLab CI/CD
+.template-name:
+  stage: build
+  script:
+    - echo "Script aqui"
+  variables:
+    EXEMPLO: "valor-padrao"
 ```
 
 ### Nomenclatura
 
-| Elemento | Padrão | Exemplo |
-|----------|--------|---------|
-| Arquivos de workflow | `{arquétipo}-{nome}.yml` ou `{arquétipo}-{nome}-{tech}.yml` | `codebase-ci-node.yml`, `codebase-ci-bun.yml` |
-| Nome de jobs | `kebab-case` | `validate-branch` |
-| Nome de steps | Português, capitalizado | `Validar Branch` |
-| Variáveis de ambiente | `SCREAMING_SNAKE_CASE` | `PROD_TAG` |
-| Inputs de workflow | `kebab-case` | `node-version`, `bun-version` |
+| Elemento | GitHub Actions | GitLab CI/CD |
+|----------|----------------|--------------|
+| **Arquivos** | `codebase-{nome}-{tech}.yml` | `codebase-{nome}-{tech}.yml` |
+| **Jobs/Templates** | `kebab-case` | `.kebab-case` (prefixo `.` para templates) |
+| **Steps** | Português, capitalizado | Português, capitalizado |
+| **Variáveis** | `SCREAMING_SNAKE_CASE` | `SCREAMING_SNAKE_CASE` |
+| **Inputs/Variables** | `kebab-case` | `kebab-case` |
 
-### Scripts Bash em Workflows
+### Exemplo: Equivalência entre Plataformas
 
 ```yaml
-- name: Exemplo de Script
-  run: |
-    # Sempre adicionar comentários explicativos
-    echo "🚀 Iniciando processo..."
+# GitHub Actions (.github/workflows/codebase-ci-node.yml)
+name: CI - Node.js
+on:
+  workflow_call:
+    inputs:
+      node-version:
+        required: false
+        type: string
+        default: '20'
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+      - run: npm ci
+      - run: npm run lint
 
-    # Usar variáveis entre chaves para clareza
-    TAG="${{ github.ref_name }}"
-
-    # Validações com mensagens claras
-    if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-      echo "::error::Tag inválida: $TAG"
-      exit 1
-    fi
+# GitLab CI/CD (.gitlab/ci/codebase-ci-node.yml)
+.node-lint:
+  image: node:${NODE_VERSION}
+  stage: test
+  before_script:
+    - npm ci
+  script:
+    - npm run lint
 ```
 
 ## Git Workflow
 
 ### Branches
 
-- `main` → Produção (protegida, requer PR aprovado)
-- `sandbox` → Homologação (protegida, requer PR aprovado) - apenas Codebase
+- `main` → Produção (protegida, requer MR/PR aprovado)
+- `sandbox` → Homologação (protegida, requer MR/PR aprovado)
 - `feat/*` → Features (temporárias)
 - `fix/*` → Correções (temporárias)
 
@@ -127,13 +222,14 @@ on:
 
 ```bash
 # Formato: tipo(escopo): descrição
-feat(codebase): adicionar validação de lint
+feat(github): adicionar validação de lint
+feat(gitlab): adicionar template de preview deploy
 fix(config): corrigir variável de ambiente
 docs(readme): atualizar instruções de uso
 refactor(workflows): simplificar job de build
 ```
 
-### Tags (Apenas Codebase)
+### Tags
 
 ```
 v1.0.0-rc.1  → Release Candidate (criada em sandbox)
@@ -142,233 +238,241 @@ v1.0.0       → Release de Produção (após merge em main)
 
 ## Testing Instructions
 
-### Antes de Abrir PR
+### Antes de Abrir PR/MR
 
-1. Validar syntax YAML: `yamllint .github/workflows/`
-2. Verificar se inputs têm valores default (retrocompatibilidade)
-3. Testar localmente com `act` se possível
+**GitHub Actions:**
+1. Validar syntax: `yamllint .github/workflows/`
+2. Testar com `act` se possível
+3. Verificar retrocompatibilidade de inputs
+
+**GitLab CI/CD:**
+1. Validar syntax: `yamllint .gitlab/`
+2. Validar via GitLab CI Lint
+3. Verificar retrocompatibilidade de variables
+
+**Ambos:**
 4. Atualizar documentação em `docs/` se necessário
-5. Atualizar exemplos em `examples/` se necessário
+5. Atualizar exemplos em `examples/github/` e `examples/gitlab/`
+6. Manter paridade de features entre plataformas
 
 ### Checklist de Review
 
-- [ ] Workflow tem header descritivo
-- [ ] Todos os inputs estão documentados
-- [ ] Steps têm nomes descritivos em português
-- [ ] Secrets não são expostos em logs
-- [ ] Erros têm mensagens claras (`::error::`)
-- [ ] Workflow segue o prefixo `codebase-`
+- [ ] **Paridade:** Feature existe em ambas plataformas (ou justificada)
+- [ ] **Documentação:** Header descritivo em ambos
+- [ ] **Inputs/Variables:** Documentados e com defaults
+- [ ] **Steps/Scripts:** Nomes descritivos em português
+- [ ] **Secrets:** Não expostos em logs
+- [ ] **Erros:** Mensagens claras
+- [ ] **Nomenclatura:** Segue padrão estabelecido
+- [ ] **Exemplos:** Atualizados em `examples/github/` e `examples/gitlab/`
 
 ## Security Considerations
 
-### Secrets
+### Secrets (Ambas Plataformas)
 
-- NUNCA fazer log de secrets
-- Usar `secrets: inherit` para passar secrets aos workflows chamados
-- Secrets sensíveis devem estar em GitHub Secrets, não no código
+**GitHub Actions:**
+```yaml
+secrets:
+  dispatch-token:
+    required: true
+
+jobs:
+  deploy:
+    steps:
+      - run: |
+          # NUNCA logar secrets
+          curl -H "Authorization: token ${{ secrets.dispatch-token }}"
+```
+
+**GitLab CI/CD:**
+```yaml
+variables:
+  # Configure no Group/Project: Settings → CI/CD → Variables
+  # Marque como Masked e Protected
+  PREVIEW_DEPLOY_TOKEN: $PREVIEW_DEPLOY_TOKEN
+
+script:
+  - |
+    # NUNCA logar secrets
+    curl -H "Authorization: token $PREVIEW_DEPLOY_TOKEN"
+```
 
 ### Validações
 
-- Sempre validar inputs antes de usar
-- Sanitizar variáveis usadas em comandos shell
-- Verificar formato de tags e branches antes de operações críticas
+```bash
+# GitHub Actions
+if [[ ! "${{ inputs.tag }}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+  echo "::error::Tag inválida"
+  exit 1
+fi
 
-### Exemplo de Validação Segura
-
-```yaml
-- name: Validar Input
-  run: |
-    # Validar formato antes de usar
-    if [[ ! "${{ inputs.tag }}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-rc\.[0-9]+)?$ ]]; then
-      echo "::error::Formato de tag inválido"
-      exit 1
-    fi
+# GitLab CI/CD
+if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+  echo "❌ Tag inválida"
+  exit 1
+fi
 ```
 
 ## Boundaries & Constraints
 
 ### O que este repositório NÃO deve conter
 
-- Código de aplicação (apenas workflows)
+- Código de aplicação (apenas workflows/pipelines)
 - Secrets hardcoded
 - Configurações específicas de projetos individuais
 - Lógica de negócio
+- Preferência por uma plataforma sobre a outra (mantenha paridade!)
 
 ### O que este repositório DEVE conter
 
-- Workflows reutilizáveis genéricos
-- Documentação de uso
-- Exemplos para projetos
+- Templates reutilizáveis para **ambas** plataformas
+- Documentação de uso (agnóstica quando possível)
+- Exemplos para projetos (separados por plataforma)
 - Scripts de automação de release
+- Paridade de features entre GitHub Actions e GitLab CI/CD
 
 ### Retrocompatibilidade
 
-- Novos inputs DEVEM ter `required: false` e `default`
+- Novos inputs/variables DEVEM ter defaults
 - Breaking changes requerem nova major version
 - Deprecações devem ser documentadas e comunicadas
+- **Mudanças devem ser propagadas para ambas plataformas**
 
-## Workflows Reference
+## Workflows/Pipelines Reference
+
+### GitHub Actions (`.github/workflows/`)
 
 | Workflow | Propósito |
 |----------|-----------|
-| `codebase-ci-node.yml` | Pipeline de CI para projetos Node.js (lint, tests, build). Suporta `upload-artifacts` para controlar upload de artefatos. |
-| `codebase-ci-bun.yml` | Pipeline de CI para projetos Bun (lint, tests, build). Suporta `upload-artifacts` para controlar upload de artefatos. |
-| `codebase-release-node.yml` | Gera artefatos .zip e publica no GitHub Releases (Node.js) |
-| `codebase-release-bun.yml` | Gera artefatos .zip e publica no GitHub Releases (Bun) |
-| `codebase-create-rc.yml` | Cria tag de Release Candidate |
-| `codebase-qualify-rc.yml` | Qualifica RC como release de produção |
-| `codebase-validate-tag.yml` | Valida nomenclatura de tags |
-| `codebase-preview-deploy.yml` | Preview deploy manual de PRs em sandbox via repository dispatch |
+| `codebase-ci-node.yml` | CI Node.js (lint, test, build) |
+| `codebase-ci-bun.yml` | CI Bun (lint, test, build) |
+| `codebase-release-node.yml` | Release Node.js (artefatos + GitHub Release) |
+| `codebase-release-bun.yml` | Release Bun (artefatos + GitHub Release) |
+| `codebase-create-rc.yml` | Criar Release Candidate |
+| `codebase-qualify-rc.yml` | Qualificar RC para produção |
+| `codebase-preview-deploy.yml` | Preview deploy manual (via repository dispatch) |
+
+### GitLab CI/CD (`.gitlab/`)
+
+| Pipeline | Propósito |
+|----------|-----------|
+| `ci/codebase-ci-node.yml` | Templates CI Node.js (.node-lint, .node-test, .node-build) |
+| `ci/codebase-ci-bun.yml` | Templates CI Bun (.bun-lint, .bun-test, .bun-build) |
+| `deploy/codebase-preview-deploy.yml` | Preview deploy manual (.preview-deploy, .stop-preview) |
+| `release/create-rc.yml` | Criar Release Candidate (.create-release-candidate) |
+| `release/qualify-release.yml` | Qualificar RC (.qualify-release) |
+
+## Common Tasks
+
+### Adicionar Nova Feature
+
+**IMPORTANTE:** Mantenha paridade entre plataformas!
+
+1. **GitHub Actions:**
+   - Criar/atualizar workflow em `.github/workflows/`
+   - Adicionar exemplo em `examples/github/`
+
+2. **GitLab CI/CD:**
+   - Criar/atualizar pipeline em `.gitlab/`
+   - Adicionar exemplo em `examples/gitlab/`
+
+3. **Documentação:**
+   - Atualizar `docs/reference/` (incluir ambas plataformas)
+   - Atualizar `README.md` (agnóstico)
+   - Se específico de plataforma, documentar em `GITLAB.md` ou docs específicas
+
+### Adicionar Suporte a Nova Tech Stack
+
+1. **GitHub Actions:** `.github/workflows/codebase-ci-{tech}.yml`
+2. **GitLab CI/CD:** `.gitlab/ci/codebase-ci-{tech}.yml`
+3. Adicionar exemplos em `examples/github/` e `examples/gitlab/`
+4. Documentar em `docs/reference/workflows.md`
+5. Manter comandos equivalentes entre plataformas
+
+### Testar Mudança em Projeto Real
+
+**GitHub Actions:**
+```yaml
+uses: iSmart-System/menura-actions/.github/workflows/codebase-ci-node.yml@sua-branch
+```
+
+**GitLab CI/CD:**
+```yaml
+include:
+  - project: 'm3nura/pipelines'
+    ref: sua-branch
+    file: '/.gitlab-ci.yml'
+```
+
+### Migrar Feature entre Plataformas
+
+Se uma feature existe apenas em uma plataforma:
+
+1. Analisar implementação existente
+2. Adaptar para a outra plataforma (respeitando idiomas nativos)
+3. Testar equivalência funcional
+4. Atualizar exemplos e documentação
+5. Marcar paridade no changelog
 
 ## Development Environment
 
 ### Ferramentas Recomendadas
 
 ```bash
-# Instalar yamllint para validação
+# Para ambas plataformas
 pip install yamllint
+brew install prettier
 
-# Instalar act para testar workflows localmente
-brew install act  # macOS
-# ou
-curl https://raw.githubusercontent.com/nektos/act/master/install.sh | sudo bash
-
-# Instalar GitHub CLI
+# GitHub Actions
+brew install act
 brew install gh
+
+# GitLab CI/CD
+brew install gitlab-runner  # Opcional, para testes locais
 ```
 
 ### VS Code Extensions
 
 - YAML (Red Hat)
 - GitHub Actions (GitHub)
+- GitLab Workflow (GitLab)
 - EditorConfig
 
-## Pull Request Guidelines
+## Pull Request / Merge Request Guidelines
 
-### Título do PR
+### Título
 
 ```
-tipo(escopo): descrição breve
+tipo(plataforma/escopo): descrição breve
 
 Exemplos:
-feat(codebase): adicionar suporte a Python
-fix(config): corrigir timeout em produção
+feat(github): adicionar suporte a Python
+feat(gitlab): adicionar template de preview deploy
+feat(both): adicionar validação de tags
+fix(gitlab): corrigir timeout em produção
 docs(readme): melhorar seção de instalação
 ```
 
-### Descrição do PR
+### Checklist no PR/MR
 
 ```markdown
 ## Resumo
 [Descrição clara da mudança]
 
-## Motivação
-[Por que essa mudança é necessária]
+## Plataforma(s) Afetada(s)
+- [ ] GitHub Actions
+- [ ] GitLab CI/CD
+- [ ] Ambas (paridade mantida)
 
 ## Mudanças
 - [Lista de alterações]
 
-## Checklist
-- [ ] Testado localmente
+## Testes
+- [ ] Testado no GitHub Actions
+- [ ] Testado no GitLab CI/CD
+- [ ] Exemplos atualizados
 - [ ] Documentação atualizada
-- [ ] Retrocompatível
 ```
-
-## Common Tasks
-
-### Configurar Novo Repositório Codebase
-
-Para configurar um novo repositório com **todas as melhores práticas**, siga o guia completo:
-
-📖 **[Tutorial: Setup Completo de Novo Repositório](docs/tutorials/setup-novo-repositorio.md)**
-
-Este guia inclui:
-- Estrutura de branches (sandbox/main)
-- Workflows CI/CD (Node.js ou Bun)
-- Proteção de branches
-- Preview deploy (opcional)
-- Code Owners
-- Templates de PR/Issue
-- Documentação básica
-
-**Resultado:** Repositório production-ready em ~45 minutos
-
-### Adicionar Novo Workflow
-
-1. Criar arquivo em `.github/workflows/codebase-{nome}.yml` ou `.github/workflows/codebase-{nome}-{tech}.yml`
-2. Usar `on: workflow_call` para torná-lo reutilizável
-3. Documentar todos os inputs com `description`
-4. Criar exemplo em `examples/codebase-project/`
-5. Adicionar entrada em `docs/reference/workflows.md`
-6. Atualizar README.md
-
-### Adicionar Suporte a Nova Tech Stack
-
-1. Criar workflow em `.github/workflows/codebase-ci-{tech}.yml`
-2. Configurar setup da runtime específica (Node, Bun, Java, etc.)
-3. Adaptar comandos de instalação, lint, teste e build
-4. Documentar inputs específicos (ex: `bun-version`)
-5. Adicionar exemplos para a nova stack
-6. Atualizar documentação de referência
-
-### Adicionar Novo Input a Workflow Existente
-
-1. Adicionar input com `required: false` e `default`
-2. Atualizar header do workflow com documentação
-3. Atualizar exemplos em `examples/`
-4. Atualizar `docs/reference/` correspondente
-
-**Exemplo:** O input `upload-artifacts` foi adicionado aos workflows CI para permitir que projetos desabilitem o upload de artefatos em PRs:
-
-```yaml
-# No projeto que consome o workflow
-with:
-  upload-artifacts: false  # Desabilita upload em PRs
-```
-
-### Adicionar Preview Deploy a um Projeto
-
-Para habilitar preview deploy manual de PRs:
-
-1. Configurar GitHub Environment `sandbox-preview` com required reviewers
-2. Criar PAT com acesso ao repositório `menura-cloud-foundation`
-3. Adicionar secret `PREVIEW_DEPLOY_TOKEN` no repositório
-4. Adicionar job de preview deploy ao workflow de CI:
-
-```yaml
-jobs:
-  ci:
-    uses: iSmart-System/menura-actions/.github/workflows/codebase-ci-node.yml@main
-    with:
-      upload-artifacts: true  # Necessário para preview
-    secrets: inherit
-
-  preview-deploy:
-    if: github.event_name == 'pull_request'
-    needs: ci
-    uses: iSmart-System/menura-actions/.github/workflows/codebase-preview-deploy.yml@main
-    with:
-      artifact-name: 'meu-app'
-      pr-number: ${{ github.event.pull_request.number }}
-      repository-name: 'meu-app'
-      branch-name: ${{ github.head_ref }}
-    secrets:
-      dispatch-token: ${{ secrets.PREVIEW_DEPLOY_TOKEN }}
-```
-
-### Testar Mudança em Projeto Real
-
-1. Criar branch com a mudança
-2. Em um projeto piloto, referenciar a branch:
-   ```yaml
-   # Para Node.js
-   uses: iSmart-System/menura-actions/.github/workflows/codebase-ci-node.yml@sua-branch
-
-   # Para Bun
-   uses: iSmart-System/menura-actions/.github/workflows/codebase-ci-bun.yml@sua-branch
-   ```
-3. Validar comportamento
-4. Após aprovação, fazer merge
 
 ---
 
