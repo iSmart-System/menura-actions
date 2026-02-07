@@ -1,48 +1,86 @@
-# Exemplos de Workflows
+# Exemplos de Pipelines
 
-Este diretório contém exemplos de workflows para repositórios **Codebase**.
+Este diretório contém exemplos práticos de uso dos templates para GitHub Actions e GitLab CI/CD.
 
-## Sobre Repositórios Codebase
+## Estrutura
 
-Repositórios que contêm código fonte de aplicações. Geram artefatos `.zip` e publicam no GitHub Releases.
+```
+examples/
+├── github/           # Exemplos GitHub Actions
+│   ├── ci-node.yml
+│   ├── ci-bun.yml
+│   ├── ci-with-preview-node.yml
+│   ├── ci-with-preview-bun.yml
+│   ├── release-node.yml
+│   ├── release-bun.yml
+│   ├── release-management.yml
+│   └── CODEOWNERS
+└── gitlab/           # Exemplos GitLab CI/CD
+    ├── ci-node.yml
+    ├── ci-bun.yml
+    ├── ci-node-skip-tests.yml
+    └── README.md
+```
 
-**Diretório:** `codebase-project/`
+## GitHub Actions
 
-| Arquivo | Descrição |
-|---------|-----------|
-| `ci-node.yml` | Pipeline de CI para projetos Node.js |
-| `ci-bun.yml` | Pipeline de CI para projetos Bun |
-| `ci-with-preview-node.yml` | CI Node.js com preview deploy opcional |
-| `ci-with-preview-bun.yml` | CI Bun com preview deploy opcional |
-| `release-node.yml` | Gera artefatos e publica releases (Node.js) |
-| `release-bun.yml` | Gera artefatos e publica releases (Bun) |
-| `release-management.yml` | Interface para criar RCs e qualificar |
-| `CODEOWNERS` | Define ownership para code review |
+Exemplos de workflows reutilizáveis para GitHub Actions.
+
+📁 [Ver exemplos GitHub](./github/)
+
+**Características:**
+- Workflows em `.github/workflows/`
+- Usa `workflow_call` para reutilização
+- Requer configuração de permissões
+- Preview deploy via actions de terceiros
+
+## GitLab CI/CD
+
+Exemplos de pipelines reutilizáveis para GitLab CI/CD.
+
+📁 [Ver exemplos GitLab](./gitlab/)
+
+**Características:**
+- Pipelines em `.gitlab-ci.yml`
+- Usa `include` e `extends` para reutilização
+- Aprovação manual nativa
+- Preview deploy com environments nativos
+
+## Comparação
+
+| Aspecto | GitHub Actions | GitLab CI/CD |
+|---------|----------------|--------------|
+| **Arquivo** | `.github/workflows/*.yml` | `.gitlab-ci.yml` |
+| **Reutilização** | `workflow_call` | `include` + `extends` |
+| **Aprovação manual** | Action terceira | Nativo (`when: manual`) |
+| **Environments** | Básico | Avançado (histórico, rollback) |
+| **Cache** | `actions/cache` | Nativo (`cache:`) |
+| **Artifacts** | `actions/upload-artifact` | Nativo (`artifacts:`) |
 
 ## Como Usar
 
-1. Copie os arquivos de workflow para `.github/workflows/` no seu projeto
-2. Copie o arquivo `CODEOWNERS` para `.github/CODEOWNERS` no seu projeto
-3. Escolha os workflows correspondentes à sua tech stack:
-   - Node.js: `ci-node.yml` + `release-node.yml`
-   - Node.js com preview: `ci-with-preview-node.yml` + `release-node.yml`
-   - Bun: `ci-bun.yml` + `release-bun.yml`
-   - Bun com preview: `ci-with-preview-bun.yml` + `release-bun.yml`
-   - Ambos: `release-management.yml`
-4. Ajuste os inputs conforme necessário (node-version/bun-version, artifact-path, etc.)
-5. Customize o CODEOWNERS conforme a estrutura de times do seu projeto
-6. Configure os secrets no repositório
-7. Para preview deploy: Configure environment `sandbox-preview` + secret `PREVIEW_DEPLOY_TOKEN`
-8. Faça commit e push
+### GitHub Actions
+1. Copie arquivos para `.github/workflows/` no seu projeto
+2. Configure secrets no repositório
+3. Ajuste inputs conforme necessário
 
-## Dicas
+### GitLab CI/CD
+1. Copie arquivo para `.gitlab-ci.yml` na raiz do projeto
+2. Configure variables no Group/Project
+3. Ajuste variables conforme necessário
 
-- Mantenha `secrets: inherit` para passar secrets automaticamente
-- Use `@main` para sempre usar a versão mais recente dos workflows
-- Use `@v1.0.0` para fixar em uma versão específica
+## Sobre Repositórios Codebase
 
-## Infraestrutura (Terraform/Terragrunt)
+Estes exemplos são para repositórios que contêm **código fonte de aplicações** (Codebase).
 
-Repositórios de infraestrutura mantêm suas próprias pipelines localmente usando Architecture Live.
+**Características:**
+- Geram artefatos (`.zip`, Docker images, etc)
+- Publicam releases (GitHub Releases, GitLab Releases)
+- Executam CI/CD completo (lint, test, build, deploy)
 
-O menura-actions foca em repositórios **Codebase** (aplicações que geram artefatos).
+**Não se aplica a:**
+- Repositórios de infraestrutura (Terraform/Terragrunt)
+- Repositórios de documentação pura
+- Repositórios de configuração
+
+> **Nota:** Repositórios de infraestrutura mantêm suas próprias pipelines localmente.

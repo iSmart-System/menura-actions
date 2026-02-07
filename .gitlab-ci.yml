@@ -1,30 +1,11 @@
 # =============================================================================
-# Menura Pipelines - Templates Reutilizáveis GitLab CI/CD
+# Menura Pipelines - Index de Templates Reutilizáveis
 # =============================================================================
-# Este arquivo inclui todos os templates reutilizáveis para projetos Menura.
-# Projetos podem incluir este arquivo e estender os templates necessários.
-# =============================================================================
-
-# IMPORTANTE: Este arquivo não executa nada por si só.
-# Ele serve apenas como índice de templates para outros projetos.
-
-# =============================================================================
-# ESTRUTURA
-# =============================================================================
-#
-# .gitlab/
-# ├── ci/
-# │   ├── codebase-ci-node.yml    # Templates Node.js (lint, test, build)
-# │   └── codebase-ci-bun.yml     # Templates Bun (lint, test, build)
-# ├── deploy/
-# │   └── codebase-preview-deploy.yml  # Preview deploy com aprovação manual
-# └── release/
-#     ├── create-rc.yml           # Criar Release Candidate
-#     └── qualify-release.yml     # Qualificar RC para produção
-#
+# IMPORTANTE: Este arquivo é o ponto de entrada para todos os templates.
+# Quando projetos fazem include deste arquivo, o GitLab processa os
+# includes locais abaixo, carregando todos os templates de .gitlab/
 # =============================================================================
 
-# Incluir todos os templates
 include:
   # CI - Continuous Integration
   - local: '.gitlab/ci/codebase-ci-node.yml'
@@ -36,90 +17,6 @@ include:
   # Release Management
   - local: '.gitlab/release/create-rc.yml'
   - local: '.gitlab/release/qualify-release.yml'
-
-# =============================================================================
-# COMO USAR
-# =============================================================================
-#
-# No seu projeto, crie .gitlab-ci.yml:
-#
-# include:
-#   - project: 'm3nura/pipelines'
-#     ref: main
-#     file: '/.gitlab-ci.yml'
-#
-# stages:
-#   - test
-#   - build
-#   - deploy
-#
-# variables:
-#   NODE_VERSION: "20"
-#   ARTIFACT_NAME: "meu-app"
-#
-# lint:
-#   extends: .node-lint
-#
-# test:
-#   extends: .node-test
-#
-# build:
-#   extends: .node-build
-#
-# preview:
-#   extends: .preview-deploy
-#
-# =============================================================================
-
-# =============================================================================
-# STAGES PADRÃO (Recomendados)
-# =============================================================================
-# Projetos devem definir seus próprios stages conforme necessário:
-#
-# stages:
-#   - test      # Lint, testes unitários, code quality
-#   - build     # Build do projeto, geração de artefatos
-#   - deploy    # Preview deploys, staging, production
-#   - release   # Criação de RCs, qualificação para prod
-# =============================================================================
-
-# =============================================================================
-# VARIÁVEIS DE CONTROLE
-# =============================================================================
-# Variáveis que controlam o comportamento dos templates:
-#
-# CI:
-#   - SKIP_LINT: "true"   # Pular lint
-#   - SKIP_TESTS: "true"  # Pular testes
-#   - SKIP_BUILD: "true"  # Pular build
-#   - NODE_VERSION: "20"  # Versão do Node.js
-#   - BUN_VERSION: "latest"  # Versão do Bun
-#   - ARTIFACT_PATH: "dist"  # Caminho dos artefatos
-#
-# Deploy:
-#   - ARTIFACT_NAME: "meu-app"  # Nome do projeto (obrigatório)
-#   - FOUNDATION_REPO: "owner/repo"  # Repo de infra (padrão: iSmart-System/menura-cloud-foundation)
-#
-# Release:
-#   - RC_VERSION: "1.0.0-rc.1"  # Versão da RC a criar
-#   - RC_TAG: "v1.0.0-rc.1"     # Tag da RC a qualificar
-# =============================================================================
-
-# =============================================================================
-# GROUP-LEVEL VARIABLES (Governança)
-# =============================================================================
-# Configure no Group m3nura: Settings → CI/CD → Variables
-#
-# Obrigatórias:
-#   - PREVIEW_DEPLOY_TOKEN (Protected, Masked)
-#     PAT com acesso ao repositório de infraestrutura
-#
-# Opcionais (para governança adicional):
-#   - PREVIEW_DEPLOY_APPROVERS
-#     Lista de aprovadores (ex: user1,user2)
-#   - PREVIEW_DEPLOY_MINIMUM_APPROVALS
-#     Mínimo de aprovações necessárias (ex: 2)
-# =============================================================================
 
 # =============================================================================
 # DOCUMENTAÇÃO
