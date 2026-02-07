@@ -1,0 +1,65 @@
+# =============================================================================
+# CI - Continuous Integration para Node.js (Reusable Pipeline)
+# =============================================================================
+# Pipeline reutilizável para projetos Node.js da organização Menura.
+# Executa lint, testes e build com cache otimizado.
+# =============================================================================
+
+.node-base:
+  image: node:${NODE_VERSION}
+  cache:
+    key:
+      files:
+        - package-lock.json
+    paths:
+      - node_modules/
+      - .npm/
+  before_script:
+    - npm ci --cache .npm --prefer-offline
+
+.node-lint:
+  extends: .node-base
+  stage: test
+  script:
+    - npm run lint
+  rules:
+    - if: '$SKIP_LINT == "true"'
+      when: never
+    - when: on_success
+  allow_failure: false
+
+.node-test:
+  extends: .node-base
+  stage: test
+  script:
+    - npm test
+  coverage: '/All files[^|]*\|[^|]*\s+([\d\.]+)/'
+  artifacts:
+    when: always
+    reports:
+      junit: junit.xml
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage/cobertura-coverage.xml
+    expire_in: 7 days
+  rules:
+    - if: '$SKIP_TESTS == "true"'
+      when: never
+    - when: on_success
+  allow_failure: false
+
+.node-build:
+  extends: .node-base
+  stage: build
+  script:
+    - npm run build
+  artifacts:
+    name: "build-$CI_COMMIT_REF_SLUG-$CI_COMMIT_SHORT_SHA"
+    paths:
+      - ${ARTIFACT_PATH:-dist}/
+      - ${ARTIFACT_PATH:-build}/
+    expire_in: 7 days
+  rules:
+    - if: '$SKIP_BUILD == "true"'
+      when: never
+    - when: on_success

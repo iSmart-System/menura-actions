@@ -1,0 +1,125 @@
+# =============================================================================
+# Preview Deploy to Sandbox (Reusable Pipeline)
+# =============================================================================
+# Pipeline reutilizável para preview deploys manuais em Merge Requests.
+# Cria environments nativos com auto-cleanup e dispara deploy no foundation.
+# =============================================================================
+
+.preview-deploy-base:
+  stage: deploy
+  image: alpine:latest
+  before_script:
+    - apk add --no-cache curl jq bash
+  script:
+    - |
+      echo "🚀 Disparando preview deploy"
+
+      # Validar inputs obrigatórios
+      if [ -z "$ARTIFACT_NAME" ]; then
+        echo "❌ ARTIFACT_NAME não definido"
+        echo "Configure: variables.ARTIFACT_NAME no seu .gitlab-ci.yml"
+        exit 1
+      fi
+
+      if [ -z "$CI_MERGE_REQUEST_IID" ]; then
+        echo "❌ Apenas disponível em Merge Requests"
+        exit 1
+      fi
+
+      # Preparar metadata
+      PREVIEW_ID="mr-$CI_MERGE_REQUEST_IID"
+      EPHEMERAL_ARTIFACT="$ARTIFACT_NAME-mr-$CI_MERGE_REQUEST_IID"
+      FOUNDATION_REPO="${FOUNDATION_REPO:-iSmart-System/menura-cloud-foundation}"
+
+      echo "📋 Metadata do Preview Deploy:"
+      echo "  - Preview ID: $PREVIEW_ID"
+      echo "  - Artefato: $EPHEMERAL_ARTIFACT"
+      echo "  - Foundation: $FOUNDATION_REPO"
+      echo "  - MR: !$CI_MERGE_REQUEST_IID"
+      echo "  - Branch: $CI_COMMIT_REF_NAME"
+      echo "  - Commit: $CI_COMMIT_SHORT_SHA"
+
+      # Validar token
+      if [ -z "$PREVIEW_DEPLOY_TOKEN" ]; then
+        echo "❌ PREVIEW_DEPLOY_TOKEN não configurado"
+        echo "Configure no Group: Settings → CI/CD → Variables"
+        exit 1
+      fi
+
+      # Disparar repository_dispatch no GitHub (temporário até foundation migrar)
+      echo "📡 Disparando deploy no foundation..."
+      HTTP_CODE=$(curl -w "%{http_code}" -o /tmp/response.json -X POST \
+        -H "Authorization: token $PREVIEW_DEPLOY_TOKEN" \
+        -H "Accept: application/vnd.github.v3+json" \
+        "https://api.github.com/repos/${FOUNDATION_REPO}/dispatches" \
+        -d @- <<EOF
+      {
+        "event_type": "preview-deploy",
+        "client_payload": {
+          "source_repo": "$CI_PROJECT_PATH",
+          "source_repo_name": "$CI_PROJECT_NAME",
+          "mr_number": "$CI_MERGE_REQUEST_IID",
+          "branch": "$CI_COMMIT_REF_NAME",
+          "commit_sha": "$CI_COMMIT_SHA",
+          "artifact_name": "$EPHEMERAL_ARTIFACT",
+          "artifact_url": "$CI_PIPELINE_URL",
+          "preview_id": "$PREVIEW_ID",
+          "environment": "sandbox",
+          "triggered_by": "$GITLAB_USER_LOGIN",
+          "gitlab_project_url": "$CI_PROJECT_URL",
+          "gitlab_mr_url": "$CI_MERGE_REQUEST_PROJECT_URL/-/merge_requests/$CI_MERGE_REQUEST_IID"
+        }
+      }
+      EOF
+      )
+
+      if [ "$HTTP_CODE" -eq 204 ]; then
+        echo "✅ Preview deploy disparado com sucesso!"
+        echo ""
+        echo "🔗 Links úteis:"
+        echo "  - MR: $CI_MERGE_REQUEST_PROJECT_URL/-/merge_requests/$CI_MERGE_REQUEST_IID"
+        echo "  - Pipeline: $CI_PIPELINE_URL"
+        echo "  - Foundation: https://github.com/$FOUNDATION_REPO/actions"
+        echo ""
+        echo "⏳ Aguarde o deploy completar no foundation..."
+        echo "📦 Preview estará disponível em alguns minutos"
+      else
+        echo "❌ Erro ao disparar deploy (HTTP $HTTP_CODE)"
+        cat /tmp/response.json
+        exit 1
+      fi
+  environment:
+    name: preview/mr-$CI_MERGE_REQUEST_IID
+    url: https://preview-mr-$CI_MERGE_REQUEST_IID.sandbox.menura.com
+    on_stop: stop_preview
+    auto_stop_in: 7 days
+    deployment_tier: development
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      when: manual  # APROVAÇÃO MANUAL NATIVA!
+  needs:
+    - job: build
+      artifacts: true
+
+.preview-deploy:
+  extends: .preview-deploy-base
+
+.stop-preview:
+  stage: deploy
+  image: alpine:latest
+  script:
+    - |
+      echo "🧹 Limpando preview environment mr-$CI_MERGE_REQUEST_IID"
+      echo ""
+      echo "ℹ️  O environment será marcado como stopped"
+      echo "ℹ️  Preview será removido automaticamente após 7 dias (auto_stop_in)"
+      echo ""
+      echo "✅ Cleanup concluído"
+  environment:
+    name: preview/mr-$CI_MERGE_REQUEST_IID
+    action: stop
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      when: manual
+  needs: []
+  allow_failure: true

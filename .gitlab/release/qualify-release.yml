@@ -1,0 +1,102 @@
+# =============================================================================
+# Qualify Release (Reusable Pipeline)
+# =============================================================================
+# Pipeline reutilizável para qualificar Release Candidates para produção.
+# Execução manual via web UI, disponível apenas na branch main.
+# =============================================================================
+
+.qualify-release:
+  stage: release
+  image: alpine:latest
+  before_script:
+    - apk add --no-cache git curl jq
+    - git config user.name "GitLab CI"
+    - git config user.email "ci@gitlab.com"
+  script:
+    - |
+      echo "✅ Qualificando Release Candidate para Produção"
+      echo ""
+
+      # Validar RC tag
+      if [ -z "$RC_TAG" ]; then
+        echo "❌ RC_TAG não definida"
+        echo ""
+        echo "Configure a variable RC_TAG antes de executar:"
+        echo "  Exemplo: RC_TAG=v1.0.0-rc.1"
+        echo ""
+        echo "Formato: vMAJOR.MINOR.PATCH-rc.NUMBER"
+        exit 1
+      fi
+
+      # Validar formato
+      if ! echo "$RC_TAG" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+-rc\.[0-9]+$'; then
+        echo "❌ Formato inválido: $RC_TAG"
+        echo ""
+        echo "Use o formato: vMAJOR.MINOR.PATCH-rc.NUMBER"
+        echo "  Exemplo: v1.0.0-rc.1"
+        exit 1
+      fi
+
+      # Verificar se RC tag existe
+      if ! git rev-parse "$RC_TAG" >/dev/null 2>&1; then
+        echo "❌ Tag $RC_TAG não existe"
+        echo ""
+        echo "Tags disponíveis:"
+        git tag -l "v*-rc.*" | tail -5
+        exit 1
+      fi
+
+      # Extrair versão de produção (remover -rc.X)
+      PROD_VERSION=$(echo "$RC_TAG" | sed 's/-rc\.[0-9]*$//')
+
+      # Verificar se versão de produção já existe
+      if git rev-parse "$PROD_VERSION" >/dev/null 2>&1; then
+        echo "❌ Tag $PROD_VERSION já existe"
+        exit 1
+      fi
+
+      echo "📋 Qualificando Release:"
+      echo "  - RC Tag: $RC_TAG"
+      echo "  - Prod Version: $PROD_VERSION"
+      echo "  - Branch: $CI_COMMIT_REF_NAME"
+      echo ""
+
+      # Buscar commit da RC
+      RC_COMMIT=$(git rev-parse "$RC_TAG")
+      RC_MESSAGE=$(git tag -l --format='%(contents)' "$RC_TAG")
+
+      echo "📝 Release Candidate:"
+      echo "$RC_MESSAGE"
+      echo ""
+
+      # Criar tag de produção no mesmo commit da RC
+      git tag -a "$PROD_VERSION" "$RC_COMMIT" -m "Release $PROD_VERSION
+
+Qualified from: $RC_TAG
+Branch: $CI_COMMIT_REF_NAME
+Pipeline: $CI_PIPELINE_URL
+Qualified by: $GITLAB_USER_LOGIN
+
+Original RC:
+$RC_MESSAGE"
+
+      # Push tag
+      git push origin "$PROD_VERSION"
+
+      echo ""
+      echo "✅ Release $PROD_VERSION qualificada e publicada!"
+      echo ""
+      echo "🔗 Tag: $CI_PROJECT_URL/-/tags/$PROD_VERSION"
+      echo ""
+      echo "📝 Próximos passos:"
+      echo "  1. O pipeline de release será disparado automaticamente"
+      echo "  2. Artefatos serão publicados no GitLab Releases"
+      echo "  3. Deploy em produção será iniciado"
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "web" && $CI_COMMIT_REF_NAME == "main"'
+      when: manual
+    - if: '$CI_COMMIT_REF_NAME == "main"'
+      when: manual
+  only:
+    - main
+  needs: []

@@ -1,0 +1,59 @@
+# =============================================================================
+# CI - Continuous Integration para Bun (Reusable Pipeline)
+# =============================================================================
+# Pipeline reutilizável para projetos Bun da organização Menura.
+# Executa lint, testes e build com cache otimizado.
+# =============================================================================
+
+.bun-base:
+  image: oven/bun:${BUN_VERSION:-latest}
+  cache:
+    key:
+      files:
+        - bun.lockb
+    paths:
+      - node_modules/
+  before_script:
+    - bun install --frozen-lockfile
+
+.bun-lint:
+  extends: .bun-base
+  stage: test
+  script:
+    - bun run lint
+  rules:
+    - if: '$SKIP_LINT == "true"'
+      when: never
+    - when: on_success
+  allow_failure: false
+
+.bun-test:
+  extends: .bun-base
+  stage: test
+  script:
+    - bun test
+  coverage: '/All files[^|]*\|[^|]*\s+([\d\.]+)/'
+  artifacts:
+    when: always
+    expire_in: 7 days
+  rules:
+    - if: '$SKIP_TESTS == "true"'
+      when: never
+    - when: on_success
+  allow_failure: false
+
+.bun-build:
+  extends: .bun-base
+  stage: build
+  script:
+    - bun run build
+  artifacts:
+    name: "build-$CI_COMMIT_REF_SLUG-$CI_COMMIT_SHORT_SHA"
+    paths:
+      - ${ARTIFACT_PATH:-dist}/
+      - ${ARTIFACT_PATH:-build}/
+    expire_in: 7 days
+  rules:
+    - if: '$SKIP_BUILD == "true"'
+      when: never
+    - when: on_success
