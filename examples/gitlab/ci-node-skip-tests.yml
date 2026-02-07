@@ -1,0 +1,41 @@
+# =============================================================================
+# Exemplo: CI Node.js pulando lint e testes
+# =============================================================================
+# Este exemplo é útil para projetos como Docusaurus que não têm lint/tests.
+# Copie este arquivo para a raiz do seu projeto como .gitlab-ci.yml
+# =============================================================================
+
+include:
+  # Incluir templates do repositório de pipelines
+  - project: 'm3nura/pipelines'
+    ref: main
+    file: '/.gitlab-ci.yml'
+
+# Definir stages
+stages:
+  - build
+  - deploy
+
+# Definir variáveis do projeto
+variables:
+  NODE_VERSION: "20"
+  ARTIFACT_PATH: "build"
+  SKIP_LINT: "true"   # Pular lint
+  SKIP_TESTS: "true"  # Pular testes
+
+# Job de build
+build:
+  extends: .node-build
+
+# Job de preview deploy (manual)
+preview:
+  extends: .preview-deploy
+  variables:
+    ARTIFACT_NAME: "menura-documentation-portal"
+  needs:
+    - job: build
+      artifacts: true
+
+# Job de cleanup do preview
+stop_preview:
+  extends: .stop-preview

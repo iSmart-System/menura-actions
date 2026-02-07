@@ -1,0 +1,48 @@
+# =============================================================================
+# Exemplo: CI para projeto Bun no GitLab
+# =============================================================================
+# Este exemplo mostra como usar os templates do m3nura/pipelines com Bun.
+# Copie este arquivo para a raiz do seu projeto como .gitlab-ci.yml
+# =============================================================================
+
+include:
+  # Incluir templates do repositório de pipelines
+  - project: 'm3nura/pipelines'
+    ref: main
+    file: '/.gitlab-ci.yml'
+
+# Definir stages
+stages:
+  - test
+  - build
+  - deploy
+
+# Definir variáveis do projeto
+variables:
+  BUN_VERSION: "latest"
+  ARTIFACT_PATH: "dist"
+
+# Job de lint
+lint:
+  extends: .bun-lint
+
+# Job de testes
+test:
+  extends: .bun-test
+
+# Job de build
+build:
+  extends: .bun-build
+
+# Job de preview deploy (manual)
+preview:
+  extends: .preview-deploy
+  variables:
+    ARTIFACT_NAME: "meu-app"  # Nome do seu projeto
+  needs:
+    - job: build
+      artifacts: true
+
+# Job de cleanup do preview
+stop_preview:
+  extends: .stop-preview

@@ -1,0 +1,277 @@
+# =============================================================================
+# Menura Pipelines - Templates Reutilizáveis GitLab CI/CD
+# =============================================================================
+# Este arquivo define templates reutilizáveis para projetos da organização Menura.
+# Projetos podem incluir estes templates usando 'include' e estendê-los com 'extends'.
+# =============================================================================
+
+# IMPORTANTE: Este arquivo não executa nada por si só.
+# Ele serve apenas como biblioteca de templates para outros projetos.
+
+# =============================================================================
+# TEMPLATES DE CI - NODE.JS
+# =============================================================================
+
+.node-base:
+  image: node:${NODE_VERSION}
+  cache:
+    key:
+      files:
+        - package-lock.json
+    paths:
+      - node_modules/
+      - .npm/
+  before_script:
+    - npm ci --cache .npm --prefer-offline
+
+.node-lint:
+  extends: .node-base
+  stage: test
+  script:
+    - npm run lint
+  rules:
+    - if: '$SKIP_LINT == "true"'
+      when: never
+    - when: on_success
+
+.node-test:
+  extends: .node-base
+  stage: test
+  script:
+    - npm test
+  coverage: '/All files[^|]*\|[^|]*\s+([\d\.]+)/'
+  artifacts:
+    when: always
+    reports:
+      junit: junit.xml
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage/cobertura-coverage.xml
+  rules:
+    - if: '$SKIP_TESTS == "true"'
+      when: never
+    - when: on_success
+
+.node-build:
+  extends: .node-base
+  stage: build
+  script:
+    - npm run build
+  artifacts:
+    name: "build-$CI_COMMIT_REF_SLUG"
+    paths:
+      - ${ARTIFACT_PATH:-dist}/
+      - ${ARTIFACT_PATH:-build}/
+    expire_in: 7 days
+  rules:
+    - if: '$SKIP_BUILD == "true"'
+      when: never
+    - when: on_success
+
+# =============================================================================
+# TEMPLATES DE CI - BUN
+# =============================================================================
+
+.bun-base:
+  image: oven/bun:${BUN_VERSION:-latest}
+  cache:
+    key:
+      files:
+        - bun.lockb
+    paths:
+      - node_modules/
+  before_script:
+    - bun install --frozen-lockfile
+
+.bun-lint:
+  extends: .bun-base
+  stage: test
+  script:
+    - bun run lint
+  rules:
+    - if: '$SKIP_LINT == "true"'
+      when: never
+    - when: on_success
+
+.bun-test:
+  extends: .bun-base
+  stage: test
+  script:
+    - bun test
+  coverage: '/All files[^|]*\|[^|]*\s+([\d\.]+)/'
+  rules:
+    - if: '$SKIP_TESTS == "true"'
+      when: never
+    - when: on_success
+
+.bun-build:
+  extends: .bun-base
+  stage: build
+  script:
+    - bun run build
+  artifacts:
+    name: "build-$CI_COMMIT_REF_SLUG"
+    paths:
+      - ${ARTIFACT_PATH:-dist}/
+      - ${ARTIFACT_PATH:-build}/
+    expire_in: 7 days
+  rules:
+    - if: '$SKIP_BUILD == "true"'
+      when: never
+    - when: on_success
+
+# =============================================================================
+# TEMPLATES DE DEPLOY - PREVIEW ENVIRONMENTS
+# =============================================================================
+
+.preview-deploy-base:
+  stage: deploy
+  image: alpine:latest
+  before_script:
+    - apk add --no-cache curl jq
+  script:
+    - |
+      echo "🚀 Disparando preview deploy para $FOUNDATION_REPO"
+
+      # Validar inputs obrigatórios
+      if [ -z "$ARTIFACT_NAME" ]; then
+        echo "❌ ARTIFACT_NAME não definido"
+        exit 1
+      fi
+
+      if [ -z "$CI_MERGE_REQUEST_IID" ]; then
+        echo "❌ Apenas disponível em Merge Requests"
+        exit 1
+      fi
+
+      # Preparar payload
+      PREVIEW_ID="mr-$CI_MERGE_REQUEST_IID"
+      EPHEMERAL_ARTIFACT="$ARTIFACT_NAME-mr-$CI_MERGE_REQUEST_IID"
+
+      # Usar repository_dispatch do GitHub (temporário até foundation migrar)
+      curl -X POST \
+        -H "Authorization: token $PREVIEW_DEPLOY_TOKEN" \
+        -H "Accept: application/vnd.github.v3+json" \
+        "https://api.github.com/repos/${FOUNDATION_REPO}/dispatches" \
+        -d @- <<EOF
+      {
+        "event_type": "preview-deploy",
+        "client_payload": {
+          "source_repo": "$CI_PROJECT_PATH",
+          "source_repo_name": "$CI_PROJECT_NAME",
+          "mr_number": "$CI_MERGE_REQUEST_IID",
+          "branch": "$CI_COMMIT_REF_NAME",
+          "commit_sha": "$CI_COMMIT_SHA",
+          "artifact_name": "$EPHEMERAL_ARTIFACT",
+          "artifact_url": "$CI_PIPELINE_URL",
+          "preview_id": "$PREVIEW_ID",
+          "environment": "sandbox",
+          "triggered_by": "$GITLAB_USER_LOGIN"
+        }
+      }
+      EOF
+
+      echo "✅ Preview deploy disparado com sucesso!"
+      echo "📦 Artefato: $EPHEMERAL_ARTIFACT"
+      echo "🔗 Preview ID: $PREVIEW_ID"
+  environment:
+    name: preview/mr-$CI_MERGE_REQUEST_IID
+    url: https://preview-mr-$CI_MERGE_REQUEST_IID.sandbox.menura.com
+    on_stop: stop_preview
+    auto_stop_in: 7 days
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      when: manual  # APROVAÇÃO MANUAL NATIVA!
+  needs:
+    - job: build
+      artifacts: true
+
+.preview-deploy:
+  extends: .preview-deploy-base
+  variables:
+    FOUNDATION_REPO: "iSmart-System/menura-cloud-foundation"
+
+.stop-preview:
+  stage: deploy
+  image: alpine:latest
+  script:
+    - echo "🧹 Limpando preview environment mr-$CI_MERGE_REQUEST_IID"
+    - echo "Preview será removido automaticamente após 7 dias"
+  environment:
+    name: preview/mr-$CI_MERGE_REQUEST_IID
+    action: stop
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      when: manual
+  needs: []
+
+# =============================================================================
+# TEMPLATES DE RELEASE
+# =============================================================================
+
+.create-release-candidate:
+  stage: release
+  image: alpine:latest
+  before_script:
+    - apk add --no-cache git curl jq
+  script:
+    - |
+      echo "🏷️ Criando Release Candidate"
+
+      # Validar versão
+      if [ -z "$RC_VERSION" ]; then
+        echo "❌ RC_VERSION não definida (ex: 1.0.0-rc.1)"
+        exit 1
+      fi
+
+      # Criar tag
+      git tag -a "v$RC_VERSION" -m "Release Candidate $RC_VERSION"
+      git push origin "v$RC_VERSION"
+
+      echo "✅ Release Candidate v$RC_VERSION criada com sucesso!"
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "web" && $CI_COMMIT_REF_NAME == "sandbox"'
+      when: manual
+  only:
+    - sandbox
+
+.qualify-release:
+  stage: release
+  image: alpine:latest
+  before_script:
+    - apk add --no-cache git curl jq
+  script:
+    - |
+      echo "✅ Qualificando Release Candidate para Produção"
+
+      # Validar RC tag
+      if [ -z "$RC_TAG" ]; then
+        echo "❌ RC_TAG não definida (ex: v1.0.0-rc.1)"
+        exit 1
+      fi
+
+      # Extrair versão sem -rc
+      PROD_VERSION=$(echo "$RC_TAG" | sed 's/-rc\.[0-9]*$//')
+
+      # Criar tag de produção
+      git tag -a "$PROD_VERSION" -m "Release $PROD_VERSION"
+      git push origin "$PROD_VERSION"
+
+      echo "✅ Release $PROD_VERSION qualificada e publicada!"
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "web" && $CI_COMMIT_REF_NAME == "main"'
+      when: manual
+  only:
+    - main
+
+# =============================================================================
+# STAGES PADRÃO
+# =============================================================================
+# Projetos devem definir seus próprios stages, mas estes são recomendados:
+#
+# stages:
+#   - test
+#   - build
+#   - deploy
+#   - release
+# =============================================================================
