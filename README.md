@@ -2,11 +2,11 @@
 
 Repositório central de governança de pipelines CI/CD para repositórios **Codebase** da organização Menura.
 
-**Suporte multi-plataforma:** GitHub Actions e GitLab CI/CD
+> **⚠️ FOCO ATUAL:** GitLab CI/CD é a plataforma principal. GitHub Actions mantido apenas para retrocompatibilidade.
 
 ## Visão Geral
 
-O menura-pipelines fornece templates reutilizáveis de CI/CD para repositórios que contêm código fonte de aplicações, com suporte para **GitHub Actions** e **GitLab CI/CD**.
+O menura-pipelines fornece templates reutilizáveis de CI/CD para repositórios que contêm código fonte de aplicações, com **foco em GitLab CI/CD** (GitHub Actions mantido para retrocompatibilidade).
 
 ### Propósito
 
@@ -35,17 +35,17 @@ O menura-pipelines fornece templates reutilizáveis de CI/CD para repositórios 
 
 ## 📚 Documentação por Plataforma
 
-Escolha sua plataforma de CI/CD para ver a documentação completa e exemplos:
-
-### GitHub Actions
-- 📖 [Documentação e Exemplos](examples/github/)
-- 🔧 [Templates Disponíveis](.github/workflows/)
-- 📝 Configuração via `workflow_call`
-
-### GitLab CI/CD
-- 📖 [Documentação e Exemplos](examples/gitlab/)
+### GitLab CI/CD (PRINCIPAL)
+- 📖 [Documentação e Exemplos Completos](examples/gitlab/)
 - 🔧 [Templates Disponíveis](.gitlab/)
 - 📝 Configuração via `include` + `extends`
+- ✅ **Todas as novas features e melhorias**
+
+### GitHub Actions (Retrocompatibilidade)
+- 📖 [Exemplos](examples/github/)
+- 🔧 [Templates](.github/workflows/)
+- 📝 Configuração via `workflow_call`
+- ⚠️ **Sem novas features** - apenas bugs críticos
 
 ---
 
@@ -310,9 +310,29 @@ refactor(core): simplificar lógica de validação
 
 ## Exemplos Práticos
 
-### GitHub Actions
+### GitLab CI/CD (PRINCIPAL - COMECE AQUI)
 ```bash
-# Ver exemplos prontos
+# Exemplos prontos e documentação completa
+examples/gitlab/
+├── README.md                      # 📖 Documentação completa
+├── ci-node.yml                    # CI Node.js
+├── ci-bun.yml                     # CI Bun
+├── ci-node-with-preview.yml       # CI + Preview Deploy
+└── ci-node-skip-tests.yml         # CI sem lint/tests (Docusaurus)
+```
+
+**Características GitLab:**
+- ✅ **Variáveis obrigatórias** com validação explícita
+- ✅ **Artefatos .zip** com conteúdo na raiz
+- ✅ **Preview deploy 100% nativo** via Pipeline Triggers
+- ✅ **Environments** com auto-cleanup (7 dias)
+- ✅ **Aprovação manual nativa**
+
+📖 **[Documentação Completa GitLab CI/CD](examples/gitlab/)** ← COMECE AQUI
+
+### GitHub Actions (Retrocompatibilidade)
+```bash
+# Mantido para retrocompatibilidade (sem novas features)
 examples/github/
 ├── ci-node.yml                    # CI Node.js
 ├── ci-bun.yml                     # CI Bun
@@ -321,19 +341,9 @@ examples/github/
 └── release-management.yml         # Release Management
 ```
 
-📖 [Documentação completa GitHub Actions](examples/github/)
+⚠️ **Sem novas features** - apenas correções críticas
 
-### GitLab CI/CD
-```bash
-# Ver exemplos prontos
-examples/gitlab/
-├── ci-node.yml                    # CI Node.js
-├── ci-bun.yml                     # CI Bun
-├── ci-node-with-preview.yml       # CI + Preview Deploy
-└── ci-node-skip-tests.yml         # CI sem lint/tests
-```
-
-📖 [Documentação completa GitLab CI/CD](GITLAB.md)
+📖 [Documentação GitHub Actions](examples/github/)
 
 ---
 
