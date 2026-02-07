@@ -38,7 +38,3 @@ preview:
   needs:
     - job: build
       artifacts: true
-
-# Job de cleanup do preview
-stop_preview:
-  extends: .stop-preview

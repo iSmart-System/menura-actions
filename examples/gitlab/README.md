@@ -96,8 +96,7 @@ Adicione:
 
 | Template | Descrição |
 |----------|-----------|
-| `.preview-deploy` | Preview deploy manual com environment nativo |
-| `.stop-preview` | Cleanup de preview environment |
+| `.preview-deploy` | Preview deploy manual com environment nativo e auto-cleanup |
 
 ### Release
 
@@ -202,9 +201,6 @@ preview:
   needs:
     - job: build
       artifacts: true
-
-stop_preview:
-  extends: .stop-preview
 ```
 
 ### Projeto Docusaurus (Sem Lint/Tests)
@@ -236,9 +232,6 @@ preview:
   needs:
     - job: build
       artifacts: true
-
-stop_preview:
-  extends: .stop-preview
 ```
 
 ---

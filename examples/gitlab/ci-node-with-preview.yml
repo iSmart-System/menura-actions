@@ -41,6 +41,3 @@ preview:
   needs:
     - job: build
       artifacts: true
-
-stop_preview:
-  extends: .stop-preview

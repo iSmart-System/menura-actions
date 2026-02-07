@@ -367,7 +367,7 @@ fi
 |----------|-----------|
 | `ci/codebase-ci-node.yml` | Templates CI Node.js (.node-lint, .node-test, .node-build) |
 | `ci/codebase-ci-bun.yml` | Templates CI Bun (.bun-lint, .bun-test, .bun-build) |
-| `deploy/codebase-preview-deploy.yml` | Preview deploy manual (.preview-deploy, .stop-preview) |
+| `deploy/codebase-preview-deploy.yml` | Preview deploy manual (.preview-deploy) com auto-cleanup |
 | `release/create-rc.yml` | Criar Release Candidate (.create-release-candidate) |
 | `release/qualify-release.yml` | Qualificar RC (.qualify-release) |
 
