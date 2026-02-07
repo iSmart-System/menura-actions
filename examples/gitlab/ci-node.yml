@@ -20,6 +20,7 @@ stages:
 variables:
   NODE_VERSION: "20"
   ARTIFACT_PATH: "dist"
+  ARTIFACT_NAME: "meu-app"
 
 # Job de lint (estende template do arquivo incluído)
 lint:

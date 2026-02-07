@@ -107,7 +107,29 @@ Adicione:
 
 ---
 
-## Variáveis de Controle
+## Variáveis Obrigatórias
+
+> **⚠️ IMPORTANTE:** Todas as variáveis abaixo são **OBRIGATÓRIAS**. Se não forem definidas, a pipeline falhará com mensagem de erro clara.
+
+### Node.js
+
+```yaml
+variables:
+  NODE_VERSION: "20"            # Obrigatório - Versão do Node.js ("18", "20", "latest")
+  ARTIFACT_PATH: "dist"         # Obrigatório - Caminho do build ("dist", "build")
+  ARTIFACT_NAME: "meu-app"      # Obrigatório - Nome do artefato
+```
+
+### Bun
+
+```yaml
+variables:
+  BUN_VERSION: "latest"         # Obrigatório - Versão do Bun ("latest", "1.0.0")
+  ARTIFACT_PATH: "dist"         # Obrigatório - Caminho do build
+  ARTIFACT_NAME: "meu-app-bun"  # Obrigatório - Nome do artefato
+```
+
+## Variáveis Opcionais
 
 ### Pular Stages Específicos
 
@@ -116,22 +138,6 @@ variables:
   SKIP_LINT: "true"   # Pular lint
   SKIP_TESTS: "true"  # Pular testes
   SKIP_BUILD: "true"  # Pular build
-```
-
-### Configurar Versões
-
-```yaml
-variables:
-  NODE_VERSION: "20"      # Node.js: "18", "20", "latest"
-  BUN_VERSION: "latest"   # Bun: "latest", "1.0.0", etc
-```
-
-### Configurar Artefatos
-
-```yaml
-variables:
-  ARTIFACT_PATH: "dist"         # Caminho do build
-  ARTIFACT_NAME: "meu-app"      # Nome do artefato
 ```
 
 ### Preview Deploy
@@ -161,8 +167,9 @@ stages:
   - build
 
 variables:
-  NODE_VERSION: "20"
-  ARTIFACT_PATH: "dist"
+  NODE_VERSION: "20"        # Obrigatório
+  ARTIFACT_PATH: "dist"     # Obrigatório
+  ARTIFACT_NAME: "meu-app"  # Obrigatório
 
 lint:
   extends: .node-lint

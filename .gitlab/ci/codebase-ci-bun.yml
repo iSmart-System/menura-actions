@@ -6,7 +6,7 @@
 # =============================================================================
 
 .bun-base:
-  image: oven/bun:${BUN_VERSION:-latest}
+  image: oven/bun:${BUN_VERSION}
   cache:
     key:
       files:
@@ -14,6 +14,14 @@
     paths:
       - node_modules/
   before_script:
+    - |
+      # Validar variáveis obrigatórias
+      if [ -z "$BUN_VERSION" ]; then
+        echo "❌ BUN_VERSION não definido"
+        echo "Configure: variables.BUN_VERSION no seu .gitlab-ci.yml"
+        echo "Exemplo: BUN_VERSION: \"latest\" ou BUN_VERSION: \"1.0.0\""
+        exit 1
+      fi
     - bun install --frozen-lockfile
 
 .bun-lint:
@@ -51,10 +59,25 @@
   script:
     - bun run build
     - |
+      # Validar variáveis obrigatórias
+      if [ -z "$ARTIFACT_PATH" ]; then
+        echo "❌ ARTIFACT_PATH não definido"
+        echo "Configure: variables.ARTIFACT_PATH no seu .gitlab-ci.yml"
+        echo "Exemplo: ARTIFACT_PATH: \"dist\" ou ARTIFACT_PATH: \"build\""
+        exit 1
+      fi
+
+      if [ -z "$ARTIFACT_NAME" ]; then
+        echo "❌ ARTIFACT_NAME não definido"
+        echo "Configure: variables.ARTIFACT_NAME no seu .gitlab-ci.yml"
+        echo "Exemplo: ARTIFACT_NAME: \"meu-app\""
+        exit 1
+      fi
+
       # Criar zip do artefato com nome único
-      BUILD_PATH="${ARTIFACT_PATH:-dist}"
+      BUILD_PATH="$ARTIFACT_PATH"
       TIMESTAMP=$(date +%s)
-      ZIP_NAME="${ARTIFACT_NAME:-artifact}-${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}-${TIMESTAMP}.zip"
+      ZIP_NAME="${ARTIFACT_NAME}-${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}-${TIMESTAMP}.zip"
 
       echo "📦 Criando arquivo compactado: $ZIP_NAME"
       echo "📁 Conteúdo do diretório: $BUILD_PATH"

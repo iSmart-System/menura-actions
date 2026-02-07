@@ -20,6 +20,7 @@ stages:
 variables:
   BUN_VERSION: "latest"
   ARTIFACT_PATH: "dist"
+  ARTIFACT_NAME: "meu-app-bun"
 
 # Job de lint (estende template do arquivo incluído)
 lint:

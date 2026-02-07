@@ -97,22 +97,31 @@ include:
 
 ## GitLab CI/CD - Variáveis Obrigatórias
 
-### Variáveis de Controle de Build
+> **⚠️ IMPORTANTE:** Todas as variáveis abaixo são **OBRIGATÓRIAS**. Se não forem definidas, a pipeline falhará com mensagem de erro clara.
 
-| Variável | Obrigatório | Padrão | Descrição |
-|----------|-------------|---------|-----------|
-| `ARTIFACT_PATH` | ❌ | `dist` | Diretório onde o build é gerado |
-| `ARTIFACT_NAME` | ✅ (para preview) | `artifact` | Nome do artefato/projeto (usado no zip) |
-| `NODE_VERSION` | ❌ | - | Versão do Node.js (ex: `"20"`) |
-| `BUN_VERSION` | ❌ | `latest` | Versão do Bun |
+### Variáveis de Build (Node.js)
+
+| Variável | Descrição | Exemplo |
+|----------|-----------|---------|
+| `NODE_VERSION` | Versão do Node.js | `"20"`, `"18"`, `"latest"` |
+| `ARTIFACT_PATH` | Diretório onde o build é gerado | `"dist"`, `"build"` |
+| `ARTIFACT_NAME` | Nome do artefato/projeto (usado no zip) | `"meu-app"` |
+
+### Variáveis de Build (Bun)
+
+| Variável | Descrição | Exemplo |
+|----------|-----------|---------|
+| `BUN_VERSION` | Versão do Bun | `"latest"`, `"1.0.0"` |
+| `ARTIFACT_PATH` | Diretório onde o build é gerado | `"dist"`, `"build"` |
+| `ARTIFACT_NAME` | Nome do artefato/projeto (usado no zip) | `"meu-app"` |
 
 ### Variáveis de Preview Deploy
 
-| Variável | Obrigatório | Descrição |
-|----------|-------------|-----------|
-| `ARTIFACT_NAME` | ✅ | Nome do projeto (ex: `"menura-documentation-portal"`) |
-| `PREVIEW_URL` | ✅ | URL completa do preview (ex: `"https://docs.sandbox.menura.com.br"`) |
-| `PREVIEW_DEPLOY_TOKEN` | ✅ | Pipeline Trigger Token do `m3nura/cloud-foundation` (configurar no Group) |
+| Variável | Descrição | Exemplo |
+|----------|-----------|---------|
+| `ARTIFACT_NAME` | Nome do projeto | `"menura-documentation-portal"` |
+| `PREVIEW_URL` | URL completa do preview | `"https://docs.sandbox.menura.com.br"` |
+| `PREVIEW_DEPLOY_TOKEN` | Pipeline Trigger Token do cloud-foundation | Configurar no Group (masked) |
 
 ### Variáveis de Controle de Fluxo
 
@@ -137,12 +146,22 @@ Os templates `.node-build` e `.bun-build` geram automaticamente um arquivo .zip 
 menura-documentation-portal-main-a1b2c3d-1707318945.zip
 ```
 
-**Exemplo de configuração:**
+**Exemplo de configuração (Node.js):**
 ```yaml
 variables:
-  ARTIFACT_PATH: "build"           # Diretório do build
-  ARTIFACT_NAME: "meu-app"         # Nome do projeto
-  PREVIEW_URL: "https://app.sandbox.menura.com.br"  # URL do preview
+  NODE_VERSION: "20"               # Versão do Node.js (obrigatório)
+  ARTIFACT_PATH: "dist"            # Diretório do build (obrigatório)
+  ARTIFACT_NAME: "meu-app"         # Nome do projeto (obrigatório)
+  PREVIEW_URL: "https://app.sandbox.menura.com.br"  # URL do preview (se usar preview deploy)
+```
+
+**Exemplo de configuração (Bun):**
+```yaml
+variables:
+  BUN_VERSION: "latest"            # Versão do Bun (obrigatório)
+  ARTIFACT_PATH: "dist"            # Diretório do build (obrigatório)
+  ARTIFACT_NAME: "meu-app-bun"     # Nome do projeto (obrigatório)
+  PREVIEW_URL: "https://app.sandbox.menura.com.br"  # URL do preview (se usar preview deploy)
 ```
 
 ### GitHub Actions (RETROCOMPATIBILIDADE APENAS)

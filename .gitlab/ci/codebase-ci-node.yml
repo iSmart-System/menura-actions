@@ -15,6 +15,14 @@
       - node_modules/
       - .npm/
   before_script:
+    - |
+      # Validar variáveis obrigatórias
+      if [ -z "$NODE_VERSION" ]; then
+        echo "❌ NODE_VERSION não definido"
+        echo "Configure: variables.NODE_VERSION no seu .gitlab-ci.yml"
+        echo "Exemplo: NODE_VERSION: \"20\""
+        exit 1
+      fi
     - npm ci --cache .npm --prefer-offline
 
 .node-lint:
@@ -54,10 +62,25 @@
   script:
     - npm run build
     - |
+      # Validar variáveis obrigatórias
+      if [ -z "$ARTIFACT_PATH" ]; then
+        echo "❌ ARTIFACT_PATH não definido"
+        echo "Configure: variables.ARTIFACT_PATH no seu .gitlab-ci.yml"
+        echo "Exemplo: ARTIFACT_PATH: \"dist\" ou ARTIFACT_PATH: \"build\""
+        exit 1
+      fi
+
+      if [ -z "$ARTIFACT_NAME" ]; then
+        echo "❌ ARTIFACT_NAME não definido"
+        echo "Configure: variables.ARTIFACT_NAME no seu .gitlab-ci.yml"
+        echo "Exemplo: ARTIFACT_NAME: \"meu-app\""
+        exit 1
+      fi
+
       # Criar zip do artefato com nome único
-      BUILD_PATH="${ARTIFACT_PATH:-dist}"
+      BUILD_PATH="$ARTIFACT_PATH"
       TIMESTAMP=$(date +%s)
-      ZIP_NAME="${ARTIFACT_NAME:-artifact}-${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}-${TIMESTAMP}.zip"
+      ZIP_NAME="${ARTIFACT_NAME}-${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}-${TIMESTAMP}.zip"
 
       echo "📦 Criando arquivo compactado: $ZIP_NAME"
       echo "📁 Conteúdo do diretório: $BUILD_PATH"
