@@ -2,7 +2,8 @@
 # Preview Deploy to Sandbox (Reusable Pipeline)
 # =============================================================================
 # Pipeline reutilizável para preview deploys manuais em Merge Requests.
-# Cria environments nativos com auto-cleanup e dispara deploy no foundation.
+# Cria environments nativos com auto-cleanup e dispara pipeline no
+# cloud-foundation via GitLab Pipeline Triggers (100% nativo!).
 # =============================================================================
 
 .preview-deploy-base:
@@ -29,12 +30,11 @@
       # Preparar metadata
       PREVIEW_ID="mr-$CI_MERGE_REQUEST_IID"
       EPHEMERAL_ARTIFACT="$ARTIFACT_NAME-mr-$CI_MERGE_REQUEST_IID"
-      FOUNDATION_REPO="${FOUNDATION_REPO:-iSmart-System/menura-cloud-foundation}"
 
       echo "📋 Metadata do Preview Deploy:"
       echo "  - Preview ID: $PREVIEW_ID"
       echo "  - Artefato: $EPHEMERAL_ARTIFACT"
-      echo "  - Foundation: $FOUNDATION_REPO"
+      echo "  - Foundation: m3nura/cloud-foundation"
       echo "  - MR: !$CI_MERGE_REQUEST_IID"
       echo "  - Branch: $CI_COMMIT_REF_NAME"
       echo "  - Commit: $CI_COMMIT_SHORT_SHA"
@@ -46,45 +46,49 @@
         exit 1
       fi
 
-      # Disparar repository_dispatch no GitHub (temporário até foundation migrar)
-      echo "📡 Disparando deploy no foundation..."
+      # Disparar pipeline trigger no GitLab (100% nativo!)
+      echo "📡 Disparando pipeline no cloud-foundation..."
       HTTP_CODE=$(curl -w "%{http_code}" -o /tmp/response.json -X POST \
-        -H "Authorization: token $PREVIEW_DEPLOY_TOKEN" \
-        -H "Accept: application/vnd.github.v3+json" \
-        "https://api.github.com/repos/${FOUNDATION_REPO}/dispatches" \
+        -H "Content-Type: application/json" \
+        "https://gitlab.com/api/v4/projects/m3nura%2Fcloud-foundation/trigger/pipeline" \
         -d @- <<EOF
       {
-        "event_type": "preview-deploy",
-        "client_payload": {
-          "source_repo": "$CI_PROJECT_PATH",
-          "source_repo_name": "$CI_PROJECT_NAME",
-          "mr_number": "$CI_MERGE_REQUEST_IID",
-          "branch": "$CI_COMMIT_REF_NAME",
-          "commit_sha": "$CI_COMMIT_SHA",
-          "artifact_name": "$EPHEMERAL_ARTIFACT",
-          "artifact_url": "$CI_PIPELINE_URL",
-          "preview_id": "$PREVIEW_ID",
-          "environment": "sandbox",
-          "triggered_by": "$GITLAB_USER_LOGIN",
-          "gitlab_project_url": "$CI_PROJECT_URL",
-          "gitlab_mr_url": "$CI_MERGE_REQUEST_PROJECT_URL/-/merge_requests/$CI_MERGE_REQUEST_IID"
+        "token": "$PREVIEW_DEPLOY_TOKEN",
+        "ref": "main",
+        "variables": {
+          "TRIGGER_SOURCE": "preview-deploy",
+          "SOURCE_REPO": "$CI_PROJECT_PATH",
+          "SOURCE_REPO_NAME": "$CI_PROJECT_NAME",
+          "MR_NUMBER": "$CI_MERGE_REQUEST_IID",
+          "BRANCH": "$CI_COMMIT_REF_NAME",
+          "COMMIT_SHA": "$CI_COMMIT_SHA",
+          "ARTIFACT_NAME": "$EPHEMERAL_ARTIFACT",
+          "ARTIFACT_URL": "$CI_PIPELINE_URL",
+          "PREVIEW_ID": "$PREVIEW_ID",
+          "ENVIRONMENT": "sandbox",
+          "TRIGGERED_BY": "$GITLAB_USER_LOGIN",
+          "GITLAB_PROJECT_URL": "$CI_PROJECT_URL",
+          "GITLAB_MR_URL": "$CI_MERGE_REQUEST_PROJECT_URL/-/merge_requests/$CI_MERGE_REQUEST_IID"
         }
       }
       EOF
       )
 
-      if [ "$HTTP_CODE" -eq 204 ]; then
-        echo "✅ Preview deploy disparado com sucesso!"
+      if [ "$HTTP_CODE" -eq 201 ]; then
+        PIPELINE_ID=$(jq -r '.id' /tmp/response.json)
+        PIPELINE_URL=$(jq -r '.web_url' /tmp/response.json)
+
+        echo "✅ Pipeline disparada com sucesso no cloud-foundation!"
         echo ""
         echo "🔗 Links úteis:"
         echo "  - MR: $CI_MERGE_REQUEST_PROJECT_URL/-/merge_requests/$CI_MERGE_REQUEST_IID"
-        echo "  - Pipeline: $CI_PIPELINE_URL"
-        echo "  - Foundation: https://github.com/$FOUNDATION_REPO/actions"
+        echo "  - Pipeline (origem): $CI_PIPELINE_URL"
+        echo "  - Pipeline (foundation): $PIPELINE_URL"
         echo ""
-        echo "⏳ Aguarde o deploy completar no foundation..."
+        echo "⏳ Aguarde o deploy completar no cloud-foundation..."
         echo "📦 Preview estará disponível em alguns minutos"
       else
-        echo "❌ Erro ao disparar deploy (HTTP $HTTP_CODE)"
+        echo "❌ Erro ao disparar pipeline (HTTP $HTTP_CODE)"
         cat /tmp/response.json
         exit 1
       fi

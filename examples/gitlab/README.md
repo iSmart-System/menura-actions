@@ -68,7 +68,7 @@ include:
 No Group/Project: **Settings → CI/CD → Variables**
 
 Adicione:
-- `PREVIEW_DEPLOY_TOKEN` (se usar preview deploy)
+- `PREVIEW_DEPLOY_TOKEN` - Pipeline Trigger Token do `m3nura/cloud-foundation` (se usar preview deploy)
 
 ---
 
@@ -137,10 +137,7 @@ variables:
 
 ### Preview Deploy
 
-```yaml
-variables:
-  FOUNDATION_REPO: "m3nura/custom-foundation"  # Repo de deploy customizado
-```
+O preview deploy é disparado automaticamente via **GitLab Pipeline Triggers** para o repositório `m3nura/cloud-foundation`.
 
 ---
 
@@ -263,16 +260,15 @@ deploy-staging:
     - if: '$CI_COMMIT_BRANCH == "develop"'
 ```
 
-### Preview Deploy Customizado
+### Preview Deploy com URL Customizada
 
 ```yaml
 preview:
   extends: .preview-deploy
   variables:
     ARTIFACT_NAME: "meu-app"
-    FOUNDATION_REPO: "m3nura/custom-foundation"
   environment:
-    url: https://preview-mr-$CI_MERGE_REQUEST_IID.custom.com
+    url: https://preview-mr-$CI_MERGE_REQUEST_IID.custom.menura.com
 ```
 
 ---
@@ -287,9 +283,19 @@ Configure no Group `m3nura`: **Settings → CI/CD → Variables**
 
 | Variable | Value | Protected | Masked | Description |
 |----------|-------|-----------|--------|-------------|
-| `PREVIEW_DEPLOY_TOKEN` | `ghp_xxx...` | ✅ | ✅ | PAT para foundation |
+| `PREVIEW_DEPLOY_TOKEN` | `glptt-xxx...` | ✅ | ✅ | Pipeline Trigger Token do cloud-foundation |
 | `PREVIEW_DEPLOY_APPROVERS` | `user1,user2` | ❌ | ❌ | Lista de aprovadores |
 | `DEPLOY_NOTIFICATION_WEBHOOK` | `https://...` | ✅ | ✅ | Webhook para notificações |
+
+#### Como Criar o Pipeline Trigger Token
+
+No repositório **`m3nura/cloud-foundation`**:
+
+1. Acesse: **Settings → CI/CD → Pipeline triggers**
+2. Clique em **Add trigger**
+3. **Description:** `Preview Deploy from Codebase repos`
+4. Copie o token gerado (`glptt-xxx...`)
+5. Adicione como variable `PREVIEW_DEPLOY_TOKEN` no Group `m3nura`
 
 **Benefícios:**
 - ✅ Herdadas por todos os projects do Group
