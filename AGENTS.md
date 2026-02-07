@@ -7,82 +7,64 @@
 
 Este é o **menura-pipelines** (anteriormente menura-actions), repositório central de governança de pipelines CI/CD para repositórios **Codebase** da organização Menura. Contém templates reutilizáveis para **GitHub Actions** e **GitLab CI/CD**.
 
+> **⚠️ IMPORTANTE - Foco Atual:** A organização está migrando TODOS os repositórios para o GitLab. Portanto, **priorize sempre o GitLab CI/CD** ao trabalhar neste repositório. Templates do GitHub Actions são mantidos apenas para retrocompatibilidade, mas NÃO devem receber novas features ou melhorias significativas.
+
 ### Propósito
 
 - Padronizar pipelines de CI/CD para repositórios Codebase
 - Automatizar gestão de releases e tags
 - Garantir governança e qualidade nas releases
-- Gerar artefatos e publicar releases
-- **Suporte multi-plataforma:** GitHub Actions E GitLab CI/CD
+- Gerar artefatos (.zip) e publicar releases
+- **Plataforma principal:** GitLab CI/CD (GitHub Actions apenas para retrocompatibilidade)
 
 > **Nota:** Repositórios de infraestrutura (Terraform/Terragrunt) mantêm suas próprias pipelines localmente.
 
 ### Stack Técnica
 
-- **Plataformas:** GitHub Actions + GitLab CI/CD
+- **Plataforma Principal:** GitLab CI/CD (GitHub Actions mantido para retrocompatibilidade)
 - **Linguagem:** YAML (workflows/pipelines), Bash (scripts)
 - **Padrão de Versionamento:** SemVer (vX.Y.Z)
 - **Branches:** `sandbox` (staging), `main` (production)
 - **Tech Stacks Suportadas:** Node.js, Bun
+- **Formato de Artefatos:** .zip (conteúdo direto na raiz, sem pasta pai)
 
 ## Project Structure
 
 ```
 m3nura/pipelines/
-├── .github/workflows/          # GitHub Actions workflows
+├── .gitlab/                    # GitLab CI/CD pipelines (PRINCIPAL)
+│   ├── ci/
+│   │   ├── codebase-ci-node.yml       # Templates Node.js (.node-lint, .node-test, .node-build)
+│   │   └── codebase-ci-bun.yml        # Templates Bun (.bun-lint, .bun-test, .bun-build)
+│   ├── deploy/
+│   │   └── codebase-preview-deploy.yml # Template preview deploy (.preview-deploy)
+│   └── release/
+│       ├── create-rc.yml               # Template criar RC (.create-release-candidate)
+│       └── qualify-release.yml         # Template qualificar RC (.qualify-release)
+├── .github/workflows/          # GitHub Actions workflows (RETROCOMPATIBILIDADE)
 │   ├── codebase-ci-node.yml
 │   ├── codebase-ci-bun.yml
 │   ├── codebase-preview-deploy.yml
 │   └── ...
-├── .gitlab/                    # GitLab CI/CD pipelines
-│   ├── ci/
-│   │   ├── codebase-ci-node.yml
-│   │   └── codebase-ci-bun.yml
-│   ├── deploy/
-│   │   └── codebase-preview-deploy.yml
-│   └── release/
-│       ├── create-rc.yml
-│       └── qualify-release.yml
+├── examples/
+│   ├── gitlab/                 # Exemplos GitLab CI/CD (PRINCIPAL)
+│   │   ├── README.md          # Documentação completa GitLab
+│   │   ├── ci-node.yml
+│   │   ├── ci-node-with-preview.yml
+│   │   └── ci-node-skip-tests.yml
+│   └── github/                 # Exemplos GitHub Actions (RETROCOMPATIBILIDADE)
 ├── docs/
 │   ├── tutorials/              # Guias de aprendizado passo-a-passo
 │   ├── how-to/                 # Guias práticos para tarefas específicas
 │   ├── reference/              # Documentação técnica detalhada
 │   └── explanation/            # Conceitos e arquitetura
-├── examples/
-│   ├── github/                 # Exemplos GitHub Actions
-│   └── gitlab/                 # Exemplos GitLab CI/CD
-├── .gitlab-ci.yml              # Index de templates GitLab
-├── GITLAB.md                   # Documentação GitLab
-├── AGENTS.md                   # Este arquivo
+├── AGENTS.md                   # Este arquivo - instruções para agentes de IA
 └── README.md                   # Documentação principal (agnóstica)
 ```
 
-## Multi-Platform Support
+## Platform Support
 
-Este repositório suporta **DUAS plataformas de CI/CD** com templates equivalentes:
-
-### GitHub Actions
-
-**Localização:** `.github/workflows/`
-
-**Como funciona:**
-```yaml
-# Projeto consome assim:
-jobs:
-  ci:
-    uses: iSmart-System/menura-actions/.github/workflows/codebase-ci-node.yml@main
-    with:
-      node-version: '20'
-    secrets: inherit
-```
-
-**Características:**
-- Usa `workflow_call` para reutilização
-- Requer configuração de permissões para repos privados
-- Preview deploy via actions de terceiros
-- Environments com proteção via required reviewers
-
-### GitLab CI/CD
+### GitLab CI/CD (PRINCIPAL - FOCO ATUAL)
 
 **Localização:** `.gitlab/`
 
@@ -113,24 +95,82 @@ include:
 - Environments avançados (histórico, rollback)
 - Include direto de arquivos específicos (sem index file)
 
-## Build & Test Commands
+## GitLab CI/CD - Variáveis Obrigatórias
 
-### GitHub Actions
+### Variáveis de Controle de Build
 
-```bash
-# Validar syntax YAML dos workflows
-yamllint .github/workflows/
+| Variável | Obrigatório | Padrão | Descrição |
+|----------|-------------|---------|-----------|
+| `ARTIFACT_PATH` | ❌ | `dist` | Diretório onde o build é gerado |
+| `ARTIFACT_NAME` | ✅ (para preview) | `artifact` | Nome do artefato/projeto (usado no zip) |
+| `NODE_VERSION` | ❌ | - | Versão do Node.js (ex: `"20"`) |
+| `BUN_VERSION` | ❌ | `latest` | Versão do Bun |
 
-# Testar workflows localmente (requer 'act' instalado)
-act -l                                # Listar workflows
-act -j <job-name>                     # Executar job específico
-act push                              # Simular evento push
+### Variáveis de Preview Deploy
 
-# Verificar erros de formatação
-prettier --check ".github/workflows/*.yml"
+| Variável | Obrigatório | Descrição |
+|----------|-------------|-----------|
+| `ARTIFACT_NAME` | ✅ | Nome do projeto (ex: `"menura-documentation-portal"`) |
+| `PREVIEW_URL` | ✅ | URL completa do preview (ex: `"https://docs.sandbox.menura.com.br"`) |
+| `PREVIEW_DEPLOY_TOKEN` | ✅ | Pipeline Trigger Token do `m3nura/cloud-foundation` (configurar no Group) |
+
+### Variáveis de Controle de Fluxo
+
+| Variável | Valor | Efeito |
+|----------|-------|--------|
+| `SKIP_LINT` | `"true"` | Pula job de lint |
+| `SKIP_TESTS` | `"true"` | Pula job de testes |
+| `SKIP_BUILD` | `"true"` | Pula job de build |
+
+### Geração de Artefatos (.zip)
+
+Os templates `.node-build` e `.bun-build` geram automaticamente um arquivo .zip com:
+
+**Características do zip:**
+- ✅ Conteúdo do `ARTIFACT_PATH` diretamente na raiz (sem pasta pai)
+- ✅ Nome único: `{ARTIFACT_NAME}-{branch}-{commit}-{timestamp}.zip`
+- ✅ Evita colisões entre pipelines
+- ✅ Exclui arquivos `.git*`
+
+**Exemplo de nome gerado:**
+```
+menura-documentation-portal-main-a1b2c3d-1707318945.zip
 ```
 
-### GitLab CI/CD
+**Exemplo de configuração:**
+```yaml
+variables:
+  ARTIFACT_PATH: "build"           # Diretório do build
+  ARTIFACT_NAME: "meu-app"         # Nome do projeto
+  PREVIEW_URL: "https://app.sandbox.menura.com.br"  # URL do preview
+```
+
+### GitHub Actions (RETROCOMPATIBILIDADE APENAS)
+
+**Localização:** `.github/workflows/`
+
+> **⚠️ IMPORTANTE:** GitHub Actions é mantido apenas para retrocompatibilidade. **NÃO adicione novas features** ou melhorias significativas. Todos os novos desenvolvimentos devem ser feitos no GitLab CI/CD.
+
+**Como funciona:**
+```yaml
+# Projeto consome assim:
+jobs:
+  ci:
+    uses: iSmart-System/menura-actions/.github/workflows/codebase-ci-node.yml@main
+    with:
+      node-version: '20'
+    secrets: inherit
+```
+
+**Características:**
+- Usa `workflow_call` para reutilização
+- Requer configuração de permissões para repos privados
+- Preview deploy via actions de terceiros
+- Artefatos .zip já implementados corretamente
+
+## Build & Test Commands
+
+### GitLab CI/CD (PRINCIPAL)
 
 ```bash
 # Validar syntax YAML das pipelines
@@ -146,27 +186,27 @@ gitlab-runner exec docker <job-name>
 prettier --check ".gitlab/**/*.yml"
 ```
 
+### GitHub Actions (Retrocompatibilidade)
+
+```bash
+# Validar syntax YAML dos workflows
+yamllint .github/workflows/
+
+# Verificar erros de formatação
+prettier --check ".github/workflows/*.yml"
+
+# NOTA: Testes locais com 'act' não são mais priorizados
+```
+
 ## Code Style Guidelines
 
-### YAML (Ambas Plataformas)
+### YAML - GitLab CI/CD (PRINCIPAL)
 
 ```yaml
 # Indentar com 2 espaços
 # Usar aspas simples para strings quando necessário
 # Comentários em português, explicativos
 
-# GitHub Actions
-name: Nome do Workflow
-on:
-  workflow_call:
-    inputs:
-      exemplo:
-        description: 'Descrição clara'
-        required: false
-        type: string
-        default: 'valor-padrao'
-
-# GitLab CI/CD
 .template-name:
   stage: build
   script:
@@ -177,38 +217,18 @@ on:
 
 ### Nomenclatura
 
-| Elemento | GitHub Actions | GitLab CI/CD |
-|----------|----------------|--------------|
-| **Arquivos** | `codebase-{nome}-{tech}.yml` | `codebase-{nome}-{tech}.yml` |
-| **Jobs/Templates** | `kebab-case` | `.kebab-case` (prefixo `.` para templates) |
-| **Steps** | Português, capitalizado | Português, capitalizado |
-| **Variáveis** | `SCREAMING_SNAKE_CASE` | `SCREAMING_SNAKE_CASE` |
-| **Inputs/Variables** | `kebab-case` | `kebab-case` |
+| Elemento | GitLab CI/CD | Observação |
+|----------|--------------|------------|
+| **Arquivos** | `codebase-{nome}-{tech}.yml` | Padrão consistente |
+| **Templates** | `.kebab-case` | Prefixo `.` obrigatório para templates |
+| **Jobs** | `kebab-case` | Jobs concretos sem prefixo `.` |
+| **Steps** | Português, capitalizado | Comentários descritivos |
+| **Variáveis** | `SCREAMING_SNAKE_CASE` | Sempre maiúsculas |
 
-### Exemplo: Equivalência entre Plataformas
+### Exemplo: Template GitLab CI/CD
 
 ```yaml
-# GitHub Actions (.github/workflows/codebase-ci-node.yml)
-name: CI - Node.js
-on:
-  workflow_call:
-    inputs:
-      node-version:
-        required: false
-        type: string
-        default: '20'
-jobs:
-  lint:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ inputs.node-version }}
-      - run: npm ci
-      - run: npm run lint
-
-# GitLab CI/CD (.gitlab/ci/codebase-ci-node.yml)
+# .gitlab/ci/codebase-ci-node.yml
 .node-lint:
   image: node:${NODE_VERSION}
   stage: test
@@ -216,6 +236,30 @@ jobs:
     - npm ci
   script:
     - npm run lint
+  rules:
+    - if: '$SKIP_LINT == "true"'
+      when: never
+    - when: on_success
+
+.node-build:
+  extends: .node-base
+  stage: build
+  script:
+    - npm run build
+    - |
+      # Criar zip do artefato com nome único
+      BUILD_PATH="${ARTIFACT_PATH:-dist}"
+      TIMESTAMP=$(date +%s)
+      ZIP_NAME="${ARTIFACT_NAME:-artifact}-${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}-${TIMESTAMP}.zip"
+
+      cd "$BUILD_PATH"
+      zip -r "../$ZIP_NAME" . -x "*.git*"
+      cd ..
+  artifacts:
+    name: "$ARTIFACT_NAME-$CI_COMMIT_REF_SLUG-$CI_COMMIT_SHORT_SHA"
+    paths:
+      - "*.zip"
+    expire_in: 7 days
 ```
 
 ## Git Workflow
@@ -259,41 +303,23 @@ v1.0.0       → Release de Produção (após merge em main)
 2. Validar via GitLab CI Lint
 3. Verificar retrocompatibilidade de variables
 
-**Ambos:**
-4. Atualizar documentação em `docs/` se necessário
-5. Atualizar exemplos em `examples/github/` e `examples/gitlab/`
-6. Manter paridade de features entre plataformas
+### Checklist de Review (GitLab CI/CD)
 
-### Checklist de Review
-
-- [ ] **Paridade:** Feature existe em ambas plataformas (ou justificada)
-- [ ] **Documentação:** Header descritivo em ambos
-- [ ] **Inputs/Variables:** Documentados e com defaults
-- [ ] **Steps/Scripts:** Nomes descritivos em português
-- [ ] **Secrets:** Não expostos em logs
-- [ ] **Erros:** Mensagens claras
-- [ ] **Nomenclatura:** Segue padrão estabelecido
-- [ ] **Exemplos:** Atualizados em `examples/github/` e `examples/gitlab/`
+- [ ] **Template:** Criado/atualizado em `.gitlab/`
+- [ ] **Documentação:** Header descritivo no template
+- [ ] **Variáveis:** Documentadas em AGENTS.md e `examples/gitlab/README.md`
+- [ ] **Variáveis Obrigatórias:** Validadas no script com mensagens claras
+- [ ] **Scripts:** Comentários em português, nomes descritivos
+- [ ] **Secrets:** Nunca expostos em logs (masked variables)
+- [ ] **Erros:** Mensagens claras com emojis (❌, ✅, 📦, etc.)
+- [ ] **Nomenclatura:** Segue padrão (`.template-name` para templates)
+- [ ] **Artefatos:** Se gera .zip, conteúdo deve estar na raiz
+- [ ] **Exemplos:** Atualizados em `examples/gitlab/`
+- [ ] **AGENTS.md:** Atualizado se for feature significativa
 
 ## Security Considerations
 
-### Secrets (Ambas Plataformas)
-
-**GitHub Actions:**
-```yaml
-secrets:
-  dispatch-token:
-    required: true
-
-jobs:
-  deploy:
-    steps:
-      - run: |
-          # NUNCA logar secrets
-          curl -H "Authorization: token ${{ secrets.dispatch-token }}"
-```
-
-**GitLab CI/CD:**
+### Secrets (GitLab CI/CD)
 ```yaml
 variables:
   # Configure no Group/Project: Settings → CI/CD → Variables
@@ -306,18 +332,26 @@ script:
     curl -H "Authorization: token $PREVIEW_DEPLOY_TOKEN"
 ```
 
-### Validações
+### Validações (GitLab CI/CD)
 
 ```bash
-# GitHub Actions
-if [[ ! "${{ inputs.tag }}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-  echo "::error::Tag inválida"
+# Validar tag SemVer
+if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-rc\.[0-9]+)?$ ]]; then
+  echo "❌ Tag inválida: $TAG"
+  echo "Formato esperado: vX.Y.Z ou vX.Y.Z-rc.N"
   exit 1
 fi
 
-# GitLab CI/CD
-if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-  echo "❌ Tag inválida"
+# Validar variável obrigatória
+if [ -z "$ARTIFACT_NAME" ]; then
+  echo "❌ ARTIFACT_NAME não definido"
+  echo "Configure: variables.ARTIFACT_NAME no seu .gitlab-ci.yml"
+  exit 1
+fi
+
+# Validar diretório existe
+if [ ! -d "$BUILD_PATH" ]; then
+  echo "❌ Diretório $BUILD_PATH não encontrado"
   exit 1
 fi
 ```
@@ -330,157 +364,186 @@ fi
 - Secrets hardcoded
 - Configurações específicas de projetos individuais
 - Lógica de negócio
-- Preferência por uma plataforma sobre a outra (mantenha paridade!)
+- **Novas features no GitHub Actions** (apenas GitLab)
 
-### O que este repositório DEVE conter
+### O que este repositório DEVE conter (GitLab CI/CD)
 
-- Templates reutilizáveis para **ambas** plataformas
-- Documentação de uso (agnóstica quando possível)
-- Exemplos para projetos (separados por plataforma)
-- Scripts de automação de release
-- Paridade de features entre GitHub Actions e GitLab CI/CD
+- Templates reutilizáveis e bem documentados
+- Documentação completa em `examples/gitlab/README.md`
+- Exemplos práticos em `examples/gitlab/`
+- Variáveis obrigatórias documentadas
+- Scripts com validações robustas
+- Mensagens de erro claras com emojis
 
-### Retrocompatibilidade
+### Retrocompatibilidade (GitLab CI/CD)
 
-- Novos inputs/variables DEVEM ter defaults
+- Novos inputs/variables DEVEM ter defaults OU validação explícita
 - Breaking changes requerem nova major version
-- Deprecações devem ser documentadas e comunicadas
-- **Mudanças devem ser propagadas para ambas plataformas**
+- Deprecações devem ser documentadas em AGENTS.md
+- GitHub Actions: mantido sem alterações (exceto bugs críticos)
 
 ## Workflows/Pipelines Reference
 
-### GitHub Actions (`.github/workflows/`)
+### GitLab CI/CD (`.gitlab/`) - PRINCIPAL
 
-| Workflow | Propósito |
-|----------|-----------|
-| `codebase-ci-node.yml` | CI Node.js (lint, test, build) |
-| `codebase-ci-bun.yml` | CI Bun (lint, test, build) |
-| `codebase-release-node.yml` | Release Node.js (artefatos + GitHub Release) |
-| `codebase-release-bun.yml` | Release Bun (artefatos + GitHub Release) |
-| `codebase-create-rc.yml` | Criar Release Candidate |
-| `codebase-qualify-rc.yml` | Qualificar RC para produção |
-| `codebase-preview-deploy.yml` | Preview deploy manual (via repository dispatch) |
+| Pipeline | Propósito | Templates Disponíveis |
+|----------|-----------|----------------------|
+| `ci/codebase-ci-node.yml` | CI Node.js (lint, test, build com .zip) | `.node-base`, `.node-lint`, `.node-test`, `.node-build` |
+| `ci/codebase-ci-bun.yml` | CI Bun (lint, test, build com .zip) | `.bun-base`, `.bun-lint`, `.bun-test`, `.bun-build` |
+| `deploy/codebase-preview-deploy.yml` | Preview deploy com Pipeline Triggers | `.preview-deploy-base`, `.preview-deploy` |
+| `release/create-rc.yml` | Criar Release Candidate (sandbox) | `.create-release-candidate` |
+| `release/qualify-release.yml` | Qualificar RC para produção (main) | `.qualify-release` |
 
-### GitLab CI/CD (`.gitlab/`)
+**Características:**
+- ✅ Artefatos gerados como .zip (conteúdo na raiz)
+- ✅ Preview deploy 100% GitLab nativo (Pipeline Triggers)
+- ✅ Environments com auto-cleanup (7 dias)
+- ✅ Aprovação manual nativa (`when: manual`)
 
-| Pipeline | Propósito |
-|----------|-----------|
-| `ci/codebase-ci-node.yml` | Templates CI Node.js (.node-lint, .node-test, .node-build) |
-| `ci/codebase-ci-bun.yml` | Templates CI Bun (.bun-lint, .bun-test, .bun-build) |
-| `deploy/codebase-preview-deploy.yml` | Preview deploy manual (.preview-deploy) com auto-cleanup |
-| `release/create-rc.yml` | Criar Release Candidate (.create-release-candidate) |
-| `release/qualify-release.yml` | Qualificar RC (.qualify-release) |
+### GitHub Actions (`.github/workflows/`) - RETROCOMPATIBILIDADE
+
+| Workflow | Propósito | Status |
+|----------|-----------|--------|
+| `codebase-ci-node.yml` | CI Node.js | ⚠️ Mantido, sem novas features |
+| `codebase-ci-bun.yml` | CI Bun | ⚠️ Mantido, sem novas features |
+| `codebase-release-node.yml` | Release Node.js | ⚠️ Mantido, sem novas features |
+| `codebase-release-bun.yml` | Release Bun | ⚠️ Mantido, sem novas features |
+| `codebase-preview-deploy.yml` | Preview deploy | ⚠️ Mantido, sem novas features |
 
 ## Common Tasks
 
 ### Adicionar Nova Feature
 
-**IMPORTANTE:** Mantenha paridade entre plataformas!
+**⚠️ IMPORTANTE:** Adicione novas features APENAS no GitLab CI/CD. GitHub Actions não deve receber novas funcionalidades.
 
-1. **GitHub Actions:**
-   - Criar/atualizar workflow em `.github/workflows/`
-   - Adicionar exemplo em `examples/github/`
-
-2. **GitLab CI/CD:**
-   - Criar/atualizar pipeline em `.gitlab/`
+1. **GitLab CI/CD (OBRIGATÓRIO):**
+   - Criar/atualizar template em `.gitlab/`
    - Adicionar exemplo em `examples/gitlab/`
+   - Documentar em `examples/gitlab/README.md`
+   - Atualizar AGENTS.md se for feature significativa
 
-3. **Documentação:**
-   - Atualizar `docs/reference/` (incluir ambas plataformas)
-   - Atualizar `README.md` (agnóstico)
-   - Se específico de plataforma, documentar em `GITLAB.md` ou docs específicas
+2. **Documentação:**
+   - Atualizar `README.md` se afetar uso geral
+   - Documentar variáveis obrigatórias em AGENTS.md
+   - Adicionar exemplos práticos em `examples/gitlab/`
+
+3. **GitHub Actions (OPCIONAL - apenas se absolutamente necessário):**
+   - Não adicionar novas features
+   - Apenas correções críticas de bugs
 
 ### Adicionar Suporte a Nova Tech Stack
 
-1. **GitHub Actions:** `.github/workflows/codebase-ci-{tech}.yml`
-2. **GitLab CI/CD:** `.gitlab/ci/codebase-ci-{tech}.yml`
-3. Adicionar exemplos em `examples/github/` e `examples/gitlab/`
-4. Documentar em `docs/reference/workflows.md`
-5. Manter comandos equivalentes entre plataformas
+1. **GitLab CI/CD:** `.gitlab/ci/codebase-ci-{tech}.yml`
+2. Adicionar exemplo em `examples/gitlab/`
+3. Documentar em `examples/gitlab/README.md`
+4. Atualizar AGENTS.md com templates e variáveis
+5. GitHub Actions: NÃO é necessário adicionar
 
-### Testar Mudança em Projeto Real
+### Testar Mudança em Projeto Real (GitLab CI/CD)
 
-**GitHub Actions:**
 ```yaml
-uses: iSmart-System/menura-actions/.github/workflows/codebase-ci-node.yml@sua-branch
-```
-
-**GitLab CI/CD:**
-```yaml
+# No .gitlab-ci.yml do projeto de teste
 include:
   - project: 'm3nura/pipelines'
-    ref: sua-branch
-    file: '.gitlab/ci/codebase-ci-node.yml'
+    ref: sua-branch-de-desenvolvimento  # Branch com suas mudanças
+    file:
+      - '.gitlab/ci/codebase-ci-node.yml'
+      - '.gitlab/deploy/codebase-preview-deploy.yml'
+
+# Configure variáveis obrigatórias
+variables:
+  NODE_VERSION: "20"
+  ARTIFACT_NAME: "projeto-teste"
+  ARTIFACT_PATH: "dist"
+  PREVIEW_URL: "https://test.sandbox.menura.com.br"
+
+# Use os templates
+lint:
+  extends: .node-lint
+
+build:
+  extends: .node-build
+
+preview:
+  extends: .preview-deploy
 ```
 
-### Migrar Feature entre Plataformas
-
-Se uma feature existe apenas em uma plataforma:
-
-1. Analisar implementação existente
-2. Adaptar para a outra plataforma (respeitando idiomas nativos)
-3. Testar equivalência funcional
-4. Atualizar exemplos e documentação
-5. Marcar paridade no changelog
+**Passos para testar:**
+1. Criar branch de desenvolvimento em `m3nura/pipelines`
+2. Fazer as mudanças nos templates
+3. Em um projeto real, apontar o `ref:` para sua branch
+4. Executar pipeline e validar comportamento
+5. Após validação, merge para `main`
 
 ## Development Environment
 
-### Ferramentas Recomendadas
+### Ferramentas Recomendadas (GitLab CI/CD)
 
 ```bash
-# Para ambas plataformas
+# Essenciais
 pip install yamllint
 brew install prettier
 
-# GitHub Actions
-brew install act
-brew install gh
+# GitLab CLI
+brew install glab
 
-# GitLab CI/CD
-brew install gitlab-runner  # Opcional, para testes locais
+# Opcional (para testes locais)
+brew install gitlab-runner
 ```
 
 ### VS Code Extensions
 
+**Essenciais:**
 - YAML (Red Hat)
-- GitHub Actions (GitHub)
 - GitLab Workflow (GitLab)
 - EditorConfig
 
-## Pull Request / Merge Request Guidelines
+**Opcionais:**
+- GitHub Actions (GitHub) - para manutenção de workflows legados
+
+## Merge Request Guidelines (GitLab)
 
 ### Título
 
 ```
-tipo(plataforma/escopo): descrição breve
+tipo(escopo): descrição breve
 
 Exemplos:
-feat(github): adicionar suporte a Python
 feat(gitlab): adicionar template de preview deploy
-feat(both): adicionar validação de tags
-fix(gitlab): corrigir timeout em produção
-docs(readme): melhorar seção de instalação
+feat(ci): adicionar suporte a Python
+fix(preview): corrigir validação de PREVIEW_URL
+refactor(build): otimizar geração de zip
+docs(agents): atualizar variáveis obrigatórias
 ```
 
-### Checklist no PR/MR
+**Tipos permitidos:** `feat`, `fix`, `refactor`, `docs`, `chore`
+
+### Checklist no MR
 
 ```markdown
 ## Resumo
 [Descrição clara da mudança]
 
-## Plataforma(s) Afetada(s)
-- [ ] GitHub Actions
-- [ ] GitLab CI/CD
-- [ ] Ambas (paridade mantida)
+## Tipo de Mudança
+- [ ] Nova feature (GitLab CI/CD)
+- [ ] Bug fix (GitLab CI/CD)
+- [ ] Bug fix crítico (GitHub Actions - apenas se absolutamente necessário)
+- [ ] Documentação
+- [ ] Refatoração
 
 ## Mudanças
-- [Lista de alterações]
+- [Lista detalhada de alterações]
 
 ## Testes
-- [ ] Testado no GitHub Actions
-- [ ] Testado no GitLab CI/CD
-- [ ] Exemplos atualizados
-- [ ] Documentação atualizada
+- [ ] Validado YAML com yamllint
+- [ ] Testado em projeto real (qual?)
+- [ ] Exemplos atualizados em `examples/gitlab/`
+- [ ] Documentação atualizada (AGENTS.md e/ou examples/gitlab/README.md)
+- [ ] Variáveis obrigatórias documentadas
+
+## Impacto
+- [ ] Breaking change? (Se sim, justifique e documente)
+- [ ] Requer atualização de projetos? (Se sim, descreva)
 ```
 
 ---
