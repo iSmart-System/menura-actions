@@ -57,9 +57,8 @@
     - bun install --frozen-lockfile
     - apk add --no-cache zip
   script:
-    - bun run build
     - |
-      # Validar variáveis obrigatórias
+      # Validar variáveis obrigatórias ANTES do build
       if [ -z "$ARTIFACT_PATH" ]; then
         echo "❌ ARTIFACT_PATH não definido"
         echo "Configure: variables.ARTIFACT_PATH no seu .gitlab-ci.yml"
@@ -73,7 +72,8 @@
         echo "Exemplo: ARTIFACT_NAME: \"meu-app\""
         exit 1
       fi
-
+    - bun run build
+    - |
       # Criar zip do artefato com nome único
       BUILD_PATH="$ARTIFACT_PATH"
       TIMESTAMP=$(date +%s)

@@ -60,9 +60,8 @@
   extends: .node-base
   stage: build
   script:
-    - npm run build
     - |
-      # Validar variáveis obrigatórias
+      # Validar variáveis obrigatórias ANTES do build
       if [ -z "$ARTIFACT_PATH" ]; then
         echo "❌ ARTIFACT_PATH não definido"
         echo "Configure: variables.ARTIFACT_PATH no seu .gitlab-ci.yml"
@@ -76,7 +75,8 @@
         echo "Exemplo: ARTIFACT_NAME: \"meu-app\""
         exit 1
       fi
-
+    - npm run build
+    - |
       # Criar zip do artefato com nome único
       BUILD_PATH="$ARTIFACT_PATH"
       TIMESTAMP=$(date +%s)
@@ -106,3 +106,5 @@
     - if: '$SKIP_BUILD == "true"'
       when: never
     - when: on_success
+
+Não ficaria mais organizado o primeiro script desse job ser as validações das variávies obrigatórias?!
