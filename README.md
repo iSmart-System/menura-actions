@@ -43,7 +43,7 @@ Escolha sua plataforma de CI/CD para ver a documentação completa e exemplos:
 - 📝 Configuração via `workflow_call`
 
 ### GitLab CI/CD
-- 📖 [Documentação Completa](GITLAB.md)
+- 📖 [Documentação e Exemplos](examples/gitlab/)
 - 🔧 [Templates Disponíveis](.gitlab/)
 - 📝 Configuração via `include` + `extends`
 
@@ -353,7 +353,7 @@ examples/gitlab/
 
 ### GitHub → GitLab
 
-Ver [Guia de Migração GitLab](GITLAB.md#migração-do-github-actions)
+Ver [Guia de Migração GitLab](examples/gitlab/#migração-do-github-actions)
 
 **Principais diferenças:**
 - `workflow_call` → `include` + `extends`

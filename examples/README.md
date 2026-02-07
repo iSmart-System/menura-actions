@@ -36,9 +36,9 @@ Exemplos de workflows reutilizáveis para GitHub Actions.
 
 ## GitLab CI/CD
 
-Exemplos de pipelines reutilizáveis para GitLab CI/CD.
+Exemplos e documentação completa para GitLab CI/CD.
 
-📁 [Ver exemplos GitLab](./gitlab/)
+📁 [Ver documentação e exemplos GitLab](./gitlab/)
 
 **Características:**
 - Pipelines em `.gitlab-ci.yml`
