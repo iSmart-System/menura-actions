@@ -53,11 +53,31 @@
   stage: build
   script:
     - npm run build
+    - |
+      # Criar zip do artefato com nome único
+      BUILD_PATH="${ARTIFACT_PATH:-dist}"
+      TIMESTAMP=$(date +%s)
+      ZIP_NAME="${ARTIFACT_NAME:-artifact}-${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}-${TIMESTAMP}.zip"
+
+      echo "📦 Criando arquivo compactado: $ZIP_NAME"
+      echo "📁 Conteúdo do diretório: $BUILD_PATH"
+
+      # Validar se o diretório existe
+      if [ ! -d "$BUILD_PATH" ]; then
+        echo "❌ Diretório $BUILD_PATH não encontrado"
+        exit 1
+      fi
+
+      # Criar zip com conteúdo direto na raiz (sem pasta pai)
+      cd "$BUILD_PATH"
+      zip -r "../$ZIP_NAME" . -x "*.git*"
+      cd ..
+
+      echo "✅ Arquivo criado: $ZIP_NAME ($(du -h $ZIP_NAME | cut -f1))"
   artifacts:
-    name: "build-$CI_COMMIT_REF_SLUG-$CI_COMMIT_SHORT_SHA"
+    name: "$ARTIFACT_NAME-$CI_COMMIT_REF_SLUG-$CI_COMMIT_SHORT_SHA"
     paths:
-      - ${ARTIFACT_PATH:-dist}/
-      - ${ARTIFACT_PATH:-build}/
+      - "*.zip"
     expire_in: 7 days
   rules:
     - if: '$SKIP_BUILD == "true"'
