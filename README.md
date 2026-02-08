@@ -83,70 +83,130 @@ flowchart TB
 | `sandbox` | Integração e homologação | ✅ Requer 1 aprovação |
 | `main` | Produção | ✅ Requer 2 aprovações |
 
-### Fluxo Padrão
+### Fluxo Padrão (GitLab CI/CD)
 
 ```mermaid
-flowchart LR
+flowchart TD
     subgraph DEV["🔧 Desenvolvimento"]
         A[Feature Branch]
     end
 
-    subgraph STAGING["🧪 Homologação"]
-        B[sandbox]
-        C[CI Pipeline]
-        D[RC Tag]
+    subgraph MR1["📝 Merge Request"]
+        B[MR para sandbox]
+        C[Build/Lint/Tests]
+        D[Preview Deploy]
     end
 
-    subgraph RELEASE["📦 Release Candidate"]
-        E[Release]
-        F[Artefato .zip]
+    subgraph STAGING["🧪 Sandbox (Homologação)"]
+        E[Branch sandbox]
+        F["❌ Sem build automático"]
+    end
+
+    subgraph RC["📦 Release Candidate (Manual)"]
+        G[Create RC]
+        H[Build + Artefato]
+        I[Tag v1.0.0-rc.1]
+        J[Deploy Sandbox]
+    end
+
+    subgraph MR2["📝 Merge Request"]
+        K[MR para main]
     end
 
     subgraph PROD["🚀 Produção"]
-        G[main]
-        H[Prod Tag]
-        I[Release]
+        L[Branch main]
+        M["❌ Sem build automático"]
+        N[Qualify RC]
+        O[Tag v1.0.0]
+        P[Deploy Produção]
     end
 
-    A -->|MR/PR + Review| B
-    B -->|Auto| C
-    C -->|Validação OK| D
-    D -->|Gera| E
+    A -->|Abre MR| B
+    B -->|Executa CI| C
+    C -->|Disponível| D
+    B -->|Aprovado| E
     E --> F
-    D -->|MR/PR + Aprovações| G
-    G -->|Merge| H
-    H -->|Gera| I
+    E -->|Manual| G
+    G --> H
+    H --> I
+    I --> J
+    J -->|Validado| K
+    K -->|Aprovado| L
+    L --> M
+    L -->|Manual| N
+    N --> O
+    O --> P
 
     style A fill:#a8dadc,stroke:#1d3557
     style B fill:#457b9d,stroke:#1d3557,color:#fff
     style C fill:#457b9d,stroke:#1d3557,color:#fff
-    style D fill:#e9c46a,stroke:#1d3557
-    style E fill:#f4a261,stroke:#1d3557
-    style F fill:#f4a261,stroke:#1d3557
-    style G fill:#2a9d8f,stroke:#1d3557,color:#fff
-    style H fill:#e76f51,stroke:#1d3557,color:#fff
+    style D fill:#457b9d,stroke:#1d3557,color:#fff
+    style E fill:#e9c46a,stroke:#1d3557
+    style F fill:#e76f51,stroke:#1d3557,color:#fff
+    style G fill:#f4a261,stroke:#1d3557
+    style H fill:#f4a261,stroke:#1d3557
     style I fill:#f4a261,stroke:#1d3557
+    style J fill:#2a9d8f,stroke:#1d3557,color:#fff
+    style K fill:#457b9d,stroke:#1d3557,color:#fff
+    style L fill:#2a9d8f,stroke:#1d3557,color:#fff
+    style M fill:#e76f51,stroke:#1d3557,color:#fff
+    style N fill:#f4a261,stroke:#1d3557
+    style O fill:#2a9d8f,stroke:#1d3557,color:#fff
+    style P fill:#2a9d8f,stroke:#1d3557,color:#fff
 ```
 
-### Ciclo de Vida Completo
+**Pontos-chave:**
+- ✅ **MRs executam CI** (build, lint, tests, preview)
+- ❌ **Sandbox/Main NÃO executam build em commits diretos** (workflow rules bloqueiam)
+- 🔐 **Release workflow é MANUAL** (Create RC e Qualify RC)
+- 🚀 **Deploys automáticos** após Create RC e Qualify RC (via triggers)
+
+### Ciclo de Vida Completo (GitLab CI/CD)
 
 ```mermaid
 sequenceDiagram
     autonumber
     participant Dev as Desenvolvedor
     participant FB as Feature Branch
-    participant SB as sandbox
-    participant RC as RC Tag
-    participant REL as Releases
-    participant MR as Merge/Pull Request
-    participant Main as main
+    participant MR1 as MR para Sandbox
+    participant SB as Branch Sandbox
+    participant CreateRC as Create RC (Manual)
+    participant CF as Cloud Foundation
+    participant MR2 as MR para Main
+    participant Main as Branch Main
+    participant QualifyRC as Qualify RC (Manual)
 
-    Dev->>FB: Cria branch feat/xxx
-    Dev->>FB: Desenvolve & Commits
-    FB->>SB: Abre MR/PR
-    Note over FB,SB: Code Review + CI
-    SB->>SB: Merge
-    Note over SB: Testes em Sandbox
+    Note over Dev,FB: 1. DESENVOLVIMENTO
+    Dev->>FB: Cria feat/xxx de sandbox
+    Dev->>FB: Implementa & commits
+    FB->>MR1: Abre MR para sandbox
+
+    Note over MR1: 2. CI/CD (Executa em MR)
+    MR1->>MR1: Build/Lint/Tests executam
+    MR1->>MR1: Preview Deploy disponível
+    Note over MR1: Aprovações + Review
+
+    MR1->>SB: Merge (SEM build automático)
+
+    Note over SB,CF: 3. RELEASE CANDIDATE
+    Dev->>CreateRC: Executa manualmente (RC_VERSION=1.0.0-rc.1)
+    CreateRC->>CreateRC: npm run build
+    CreateRC->>CreateRC: Gera app-v1.0.0-rc.1-abc123-123456.zip
+    CreateRC->>SB: Cria tag v1.0.0-rc.1
+    CreateRC->>CF: Trigger deploy (sandbox)
+    CF->>CF: Deploy em sandbox
+    Note over CreateRC,CF: Validação & Homologação
+
+    Note over SB,Main: 4. PRODUÇÃO
+    SB->>MR2: Abre MR para main
+    Note over MR2: Aprovações + GMUD
+    MR2->>Main: Merge (SEM build automático)
+
+    Dev->>QualifyRC: Executa manualmente (RC_TAG=v1.0.0-rc.1)
+    QualifyRC->>Main: Cria tag v1.0.0
+    QualifyRC->>SB: Remove tag v1.0.0-rc.1
+    QualifyRC->>CF: Trigger deploy (production)
+    CF->>CF: Deploy em produção
 
     Dev->>RC: Executa "Create RC"
     RC->>REL: Tag v1.0.0-rc.1 + Release

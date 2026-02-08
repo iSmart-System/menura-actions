@@ -39,8 +39,10 @@ m3nura/pipelines/
 │   ├── deploy/
 │   │   └── codebase-preview-deploy.yml # Template preview deploy (.preview-deploy)
 │   └── release/
-│       ├── create-rc.yml               # Template criar RC (.create-release-candidate)
-│       └── qualify-release.yml         # Template qualificar RC (.qualify-release)
+│       ├── create-rc.yml               # Template genérico criar RC (.create-release-candidate)
+│       ├── create-rc-node.yml          # Template criar RC Node.js (.create-rc-node)
+│       ├── create-rc-bun.yml           # Template criar RC Bun (.create-rc-bun)
+│       └── qualify-rc-to-release.yml   # Template qualificar RC (.qualify-rc-to-release)
 ├── .github/workflows/          # GitHub Actions workflows (RETROCOMPATIBILIDADE)
 │   ├── codebase-ci-node.yml
 │   ├── codebase-ci-bun.yml
@@ -49,9 +51,12 @@ m3nura/pipelines/
 ├── examples/
 │   ├── gitlab/                 # Exemplos GitLab CI/CD (PRINCIPAL)
 │   │   ├── README.md          # Documentação completa GitLab
-│   │   ├── ci-node.yml
-│   │   ├── ci-node-with-preview.yml
-│   │   └── ci-node-skip-tests.yml
+│   │   ├── ci-node.yml                  # CI básico Node.js
+│   │   ├── ci-bun.yml                   # CI básico Bun
+│   │   ├── ci-node-with-preview.yml     # CI + Preview Deploy
+│   │   ├── ci-node-skip-tests.yml       # CI sem lint/tests (Docusaurus)
+│   │   ├── ci-node-with-release.yml     # CI + Preview + Release Management (Node.js)
+│   │   └── ci-bun-with-release.yml      # CI + Preview + Release Management (Bun)
 │   └── github/                 # Exemplos GitHub Actions (RETROCOMPATIBILIDADE)
 ├── docs/
 │   ├── tutorials/              # Guias de aprendizado passo-a-passo
@@ -163,6 +168,168 @@ variables:
   ARTIFACT_NAME: "meu-app-bun"     # Nome do projeto (obrigatório)
   PREVIEW_URL: "https://app.sandbox.menura.com.br"  # URL do preview (se usar preview deploy)
 ```
+
+## GitLab CI/CD - Workflow Rules (CRÍTICO)
+
+> **⚠️ OBRIGATÓRIO:** Todos os projetos DEVEM incluir estas workflow rules para garantir governança.
+
+**Problema:** Sem workflow rules, commits diretos em `sandbox`/`main` disparam builds desnecessários.
+
+**Solução:** Adicionar no `.gitlab-ci.yml`:
+
+```yaml
+workflow:
+  rules:
+    # Permitir MRs (Merge Requests)
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    # Evitar duplicação se já existe MR aberto para a branch
+    - if: '$CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS'
+      when: never
+    # BLOQUEAR commits diretos em sandbox e main (usar workflow de release!)
+    - if: '$CI_COMMIT_BRANCH == "sandbox" || $CI_COMMIT_BRANCH == "main"'
+      when: never
+    # Permitir outras branches (feature, fix, etc.)
+    - if: '$CI_COMMIT_BRANCH'
+```
+
+**O que isso faz:**
+- ✅ MRs executam build/lint/tests normalmente
+- ✅ Feature branches executam build/lint/tests normalmente
+- ❌ Commits diretos em `sandbox` NÃO executam pipeline (use Create RC)
+- ❌ Commits diretos em `main` NÃO executam pipeline (use Qualify RC)
+
+**Por quê:**
+- Branches `sandbox`/`main` são protegidas
+- Mudanças chegam via MRs (feature → sandbox) ou release workflow (sandbox → main)
+- Evita desperdício de minutos de CI
+
+## GitLab CI/CD - Fluxo de Release Completo
+
+### Visão Geral do Fluxo
+
+```
+1. Feature → Sandbox (via MR)
+   └─► Build/Lint/Tests executam no MR
+   └─► Preview deploy disponível
+   └─► Merge após aprovação
+
+2. Create Release Candidate (Manual na branch sandbox)
+   └─► Build executado
+   └─► Artefato RC gerado: app-v1.0.0-rc.1-abc123-1234567890.zip
+   └─► Tag RC criada: v1.0.0-rc.1
+   └─► Trigger para cloud-foundation → Deploy em sandbox
+
+3. Validação RC
+   └─► Testes de homologação
+   └─► Aprovações de stakeholders
+
+4. Qualify RC to Release (Manual na branch main)
+   └─► MR sandbox → main (aprovado e merged)
+   └─► Tag de produção criada: v1.0.0
+   └─► Tag RC antiga removida: v1.0.0-rc.1
+   └─► Trigger para cloud-foundation → Deploy em produção
+```
+
+### Templates de Release Disponíveis
+
+| Template | Runtime | Onde Executar | O que faz |
+|----------|---------|---------------|-----------|
+| `.create-rc-node` | Node.js | Branch `sandbox` (manual) | Build → Artefato RC → Tag RC → Trigger Deploy |
+| `.create-rc-bun` | Bun | Branch `sandbox` (manual) | Build → Artefato RC → Tag RC → Trigger Deploy |
+| `.qualify-rc-to-release` | Agnóstico | Branch `main` (manual) | Tag Produção → Remove RC → Trigger Deploy |
+
+### 1. Criar Release Candidate
+
+**Quando:** Após validação em sandbox, pronto para homologação.
+
+**Como executar:**
+1. Vá na pipeline da branch `sandbox`
+2. Clique em "Run pipeline"
+3. Adicione variable: `RC_VERSION=1.0.0-rc.1`
+4. Execute o job `create-rc` manualmente
+
+**O que acontece:**
+```yaml
+# Exemplo de uso no .gitlab-ci.yml
+include:
+  - project: 'm3nura/pipelines'
+    ref: main
+    file: '.gitlab/release/create-rc-node.yml'  # ou create-rc-bun.yml
+
+create-rc:
+  extends: .create-rc-node  # ou .create-rc-bun
+  stage: release
+```
+
+**Resultado:**
+- ✅ Build executado (npm run build ou bun run build)
+- ✅ Artefato criado com nomenclatura RC: `${ARTIFACT_NAME}-v${RC_VERSION}-${COMMIT}-${TIMESTAMP}.zip`
+- ✅ Conteúdo do artefato direto na raiz (sem pasta pai)
+- ✅ Tag Git criada: `v1.0.0-rc.1`
+- ✅ Artefato disponível como job artifact (30 dias)
+- ✅ Trigger disparado para `m3nura/cloud-foundation` com variáveis:
+  - `TRIGGER_SOURCE=rc-deploy`
+  - `RC_VERSION=v1.0.0-rc.1`
+  - `ARTIFACT_URL=<job-artifacts-url>`
+  - `ENVIRONMENT=sandbox`
+
+**Variável necessária no Group:**
+- `CLOUD_FOUNDATION_TOKEN` - Pipeline Trigger Token do repositório `m3nura/cloud-foundation`
+
+### 2. Qualificar RC para Produção
+
+**Quando:** Após RC validada e homologada, com GMUD aprovada.
+
+**Pré-requisitos:**
+1. RC criada e testada (ex: `v1.0.0-rc.1`)
+2. MR de `sandbox` → `main` criado e aprovado
+3. MR merged
+
+**Como executar:**
+1. Vá na pipeline da branch `main` (após merge)
+2. Clique em "Run pipeline"
+3. Adicione variable: `RC_TAG=v1.0.0-rc.1`
+4. Execute o job `qualify-rc` manualmente
+
+**O que acontece:**
+```yaml
+# Exemplo de uso no .gitlab-ci.yml
+include:
+  - project: 'm3nura/pipelines'
+    ref: main
+    file: '.gitlab/release/qualify-rc-to-release.yml'
+
+qualify-rc:
+  extends: .qualify-rc-to-release
+  stage: release
+```
+
+**Resultado:**
+- ✅ Tag de produção criada: `v1.0.0` (no mesmo commit da RC)
+- ✅ Tag RC antiga removida: `v1.0.0-rc.1` (já foi qualificada)
+- ✅ Trigger disparado para `m3nura/cloud-foundation` com variáveis:
+  - `TRIGGER_SOURCE=production-deploy`
+  - `PROD_VERSION=v1.0.0`
+  - `RC_TAG=v1.0.0-rc.1` (para rastreabilidade)
+  - `ENVIRONMENT=production`
+
+### Nomenclatura de Artefatos
+
+**Release Candidates:**
+```
+${ARTIFACT_NAME}-v${RC_VERSION}-${COMMIT_SHORT_SHA}-${TIMESTAMP}.zip
+
+Exemplo real:
+menura-documentation-portal-v1.0.0-rc.1-a3b2c1d-1707398472.zip
+```
+
+**Produção:**
+Os artefatos de produção usam os MESMOS artefatos da RC (mesmo commit).
+O cloud-foundation identifica qual artefato usar baseado na RC_TAG original.
+
+### Exemplo Completo
+
+Ver: `examples/gitlab/ci-node-with-release.yml` ou `examples/gitlab/ci-bun-with-release.yml`
 
 ### GitHub Actions (RETROCOMPATIBILIDADE APENAS)
 

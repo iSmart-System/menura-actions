@@ -8,10 +8,49 @@ Documentação e exemplos práticos para usar os templates do `m3nura/pipelines`
 
 | Arquivo | Descrição | Quando Usar |
 |---------|-----------|-------------|
-| [`ci-node.yml`](ci-node.yml) | CI completo para Node.js | Projetos Node.js com lint, testes e build |
-| [`ci-bun.yml`](ci-bun.yml) | CI completo para Bun | Projetos Bun com lint, testes e build |
+| [`ci-node.yml`](ci-node.yml) | CI básico para Node.js | Projetos Node.js com lint, testes e build |
+| [`ci-bun.yml`](ci-bun.yml) | CI básico para Bun | Projetos Bun com lint, testes e build |
 | [`ci-node-with-preview.yml`](ci-node-with-preview.yml) | CI Node.js + Preview Deploy | Projetos que precisam preview em MRs |
-| [`ci-node-skip-tests.yml`](ci-node-skip-tests.yml) | CI Node.js sem lint/tests | Projetos como Docusaurus |
+| [`ci-node-skip-tests.yml`](ci-node-skip-tests.yml) | CI Node.js sem lint/tests | Projetos como Docusaurus (sem testes) |
+| [`ci-node-with-release.yml`](ci-node-with-release.yml) | **CI + Preview + Release Management (Node.js)** | **Projetos prontos para produção (RECOMENDADO)** |
+| [`ci-bun-with-release.yml`](ci-bun-with-release.yml) | **CI + Preview + Release Management (Bun)** | **Projetos Bun prontos para produção (RECOMENDADO)** |
+
+---
+
+## ⚠️ OBRIGATÓRIO: Workflow Rules
+
+> **CRÍTICO:** Todos os projetos DEVEM incluir estas workflow rules para garantir governança.
+
+**Problema:** Sem workflow rules, commits diretos em `sandbox`/`main` disparam builds desnecessários e desperdiçam minutos de CI.
+
+**Solução:** Adicione no início do seu `.gitlab-ci.yml`:
+
+```yaml
+workflow:
+  rules:
+    # Permitir MRs (Merge Requests)
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    # Evitar duplicação se já existe MR aberto para a branch
+    - if: '$CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS'
+      when: never
+    # BLOQUEAR commits diretos em sandbox e main
+    - if: '$CI_COMMIT_BRANCH == "sandbox" || $CI_COMMIT_BRANCH == "main"'
+      when: never
+    # Permitir outras branches (feature, fix, etc.)
+    - if: '$CI_COMMIT_BRANCH'
+```
+
+**O que isso faz:**
+- ✅ MRs executam build/lint/tests normalmente
+- ✅ Feature branches executam build/lint/tests normalmente
+- ❌ Commits diretos em `sandbox` NÃO executam (use Create RC)
+- ❌ Commits diretos em `main` NÃO executam (use Qualify RC)
+
+**Por quê:**
+- Branches `sandbox`/`main` são protegidas
+- Mudanças chegam via MRs ou release workflow
+- Evita desperdício de minutos de CI
+- Força governança no processo de release
 
 ---
 
@@ -248,6 +287,160 @@ preview:
     - job: build
       artifacts: true
 ```
+
+---
+
+## Release Management
+
+> 🚀 **Fluxo completo de release com Release Candidates (RC) e deploy automatizado**
+
+### Visão Geral
+
+```
+Feature → Sandbox → RC → Produção
+
+1. Feature branch → MR para sandbox → Build/Tests → Merge
+2. Manual: Create RC → Build → Artefato → Tag → Deploy Sandbox
+3. Validação/Homologação
+4. Manual: Qualify RC → Tag Produção → Deploy Produção
+```
+
+### Templates Disponíveis
+
+| Template | Para | Onde Executar | O que faz |
+|----------|------|---------------|-----------|
+| `.create-rc-node` | Node.js | Branch `sandbox` | Build → Artefato RC → Tag → Deploy |
+| `.create-rc-bun` | Bun | Branch `sandbox` | Build → Artefato RC → Tag → Deploy |
+| `.qualify-rc-to-release` | Qualquer | Branch `main` | Tag Produção → Remove RC → Deploy |
+
+### Passo 1: Criar Release Candidate
+
+**Quando:** Após features prontas em sandbox, pronto para homologação.
+
+**Como executar:**
+1. Vá na pipeline da branch `sandbox` no GitLab
+2. Clique em "Run pipeline"
+3. Adicione variable: `RC_VERSION=1.0.0-rc.1`
+4. Execute o job `create-rc` manualmente
+
+**Exemplo de configuração:**
+```yaml
+include:
+  - project: 'm3nura/pipelines'
+    ref: main
+    file:
+      - '.gitlab/ci/codebase-ci-node.yml'
+      - '.gitlab/release/create-rc-node.yml'  # Para Node.js
+
+stages:
+  - test
+  - build
+  - release
+
+variables:
+  NODE_VERSION: "20"
+  ARTIFACT_PATH: "dist"
+  ARTIFACT_NAME: "meu-app"
+
+# Jobs de CI (lint, test, build)
+lint:
+  extends: .node-lint
+
+test:
+  extends: .node-test
+
+build:
+  extends: .node-build
+
+# Job de Release
+create-rc:
+  extends: .create-rc-node
+  stage: release
+```
+
+**O que acontece:**
+- ✅ Build executado (npm run build)
+- ✅ Artefato criado: `meu-app-v1.0.0-rc.1-abc123-1234567890.zip`
+- ✅ Conteúdo direto na raiz do zip (sem pasta pai)
+- ✅ Tag Git criada: `v1.0.0-rc.1`
+- ✅ Trigger disparado para `m3nura/cloud-foundation`
+- ✅ Deploy em sandbox executado
+
+### Passo 2: Validar RC
+
+Após deploy em sandbox:
+- Executar testes de homologação
+- Validar funcionalidades
+- Obter aprovações de stakeholders
+
+Se encontrar bugs:
+1. Corrigir na feature branch
+2. MR para sandbox
+3. Criar nova RC (ex: `v1.0.0-rc.2`)
+
+### Passo 3: Qualificar RC para Produção
+
+**Quando:** Após RC validada e homologada, com GMUD aprovada.
+
+**Pré-requisitos:**
+1. RC criada e testada (ex: `v1.0.0-rc.1`)
+2. MR de `sandbox` → `main` criado e aprovado
+3. MR merged
+
+**Como executar:**
+1. Vá na pipeline da branch `main` no GitLab
+2. Clique em "Run pipeline"
+3. Adicione variable: `RC_TAG=v1.0.0-rc.1`
+4. Execute o job `qualify-rc` manualmente
+
+**Exemplo de configuração:**
+```yaml
+include:
+  - project: 'm3nura/pipelines'
+    ref: main
+    file:
+      - '.gitlab/ci/codebase-ci-node.yml'
+      - '.gitlab/release/qualify-rc-to-release.yml'
+
+stages:
+  - test
+  - build
+  - release
+
+# ... outros jobs ...
+
+qualify-rc:
+  extends: .qualify-rc-to-release
+  stage: release
+```
+
+**O que acontece:**
+- ✅ Tag de produção criada: `v1.0.0`
+- ✅ Tag RC antiga removida: `v1.0.0-rc.1`
+- ✅ Trigger disparado para `m3nura/cloud-foundation`
+- ✅ Deploy em produção executado
+
+### Exemplo Completo com Release Management
+
+Ver:
+- [`ci-node-with-release.yml`](ci-node-with-release.yml) - Node.js
+- [`ci-bun-with-release.yml`](ci-bun-with-release.yml) - Bun
+
+### Variável Necessária
+
+Configure no **Group level** (Settings → CI/CD → Variables):
+
+| Variable | Value | Protected | Masked | Description |
+|----------|-------|-----------|--------|-------------|
+| `CLOUD_FOUNDATION_TOKEN` | `glptt-xxx...` | ✅ | ✅ | Pipeline Trigger Token do m3nura/cloud-foundation |
+
+**Como criar o token:**
+1. Vá em `m3nura/cloud-foundation`
+2. Settings → CI/CD → Pipeline triggers
+3. Clique em "Add trigger"
+4. Description: "Deploy from Codebase repos"
+5. Copie o token (`glptt-xxx...`)
+6. Adicione no Group `m3nura` como `CLOUD_FOUNDATION_TOKEN`
 
 ---
 

@@ -5,6 +5,20 @@
 # Copie este arquivo para a raiz do seu projeto como .gitlab-ci.yml
 # =============================================================================
 
+# Workflow rules: controla quando a pipeline é executada
+workflow:
+  rules:
+    # Permitir MRs (Merge Requests)
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    # Evitar duplicação se já existe MR aberto para a branch
+    - if: '$CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS'
+      when: never
+    # BLOQUEAR commits diretos em sandbox e main (usar workflow de release!)
+    - if: '$CI_COMMIT_BRANCH == "sandbox" || $CI_COMMIT_BRANCH == "main"'
+      when: never
+    # Permitir outras branches (feature, fix, etc.)
+    - if: '$CI_COMMIT_BRANCH'
+
 include:
   # Include DIRETO de múltiplos arquivos específicos (GitLab 13.6+)
   - project: 'm3nura/pipelines'

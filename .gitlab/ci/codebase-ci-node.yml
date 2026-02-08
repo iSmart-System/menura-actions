@@ -106,5 +106,3 @@
     - if: '$SKIP_BUILD == "true"'
       when: never
     - when: on_success
-
-Não ficaria mais organizado o primeiro script desse job ser as validações das variávies obrigatórias?!

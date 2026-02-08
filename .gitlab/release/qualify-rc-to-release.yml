@@ -1,7 +1,8 @@
 # =============================================================================
-# Qualify Release (Reusable Pipeline)
+# Qualify RC to Release (Reusable Pipeline)
 # =============================================================================
 # Pipeline reutilizável para qualificar Release Candidates para produção.
+# Cria tag de produção, remove tag RC antiga e dispara deploy no cloud-foundation.
 # Execução manual via web UI, disponível apenas na branch main.
 # =============================================================================
 
@@ -84,14 +85,60 @@ $RC_MESSAGE"
       git push origin "$PROD_VERSION"
 
       echo ""
+      echo "✅ Tag $PROD_VERSION criada e publicada!"
+      echo ""
+
+      # Apagar tag RC antiga (já foi qualificada)
+      echo "🗑️  Removendo tag RC antiga..."
+      git tag -d "$RC_TAG" || true
+      git push origin ":refs/tags/$RC_TAG" || true
+      echo "✅ Tag RC removida"
+      echo ""
+
+      # Trigger Cloud Foundation para deploy em produção
+      echo "🚀 Disparando deploy em produção..."
+
+      # Validar token
+      if [ -z "$CLOUD_FOUNDATION_TOKEN" ]; then
+        echo "⚠️  CLOUD_FOUNDATION_TOKEN não configurado"
+        echo "Deploy automático não será disparado"
+        echo "Configure no Group: Settings → CI/CD → Variables"
+      else
+        HTTP_CODE=$(curl -w "%{http_code}" -o /tmp/response.json -X POST \
+          "https://gitlab.com/api/v4/projects/m3nura%2Fcloud-foundation/trigger/pipeline" \
+          -d "token=$CLOUD_FOUNDATION_TOKEN" \
+          -d "ref=main" \
+          -d "variables[TRIGGER_SOURCE]=production-deploy" \
+          -d "variables[SOURCE_PROJECT]=$CI_PROJECT_PATH" \
+          -d "variables[PROD_VERSION]=$PROD_VERSION" \
+          -d "variables[RC_TAG]=$RC_TAG" \
+          -d "variables[ENVIRONMENT]=production" \
+          -d "variables[GITLAB_USER]=$GITLAB_USER_LOGIN")
+
+        if [ "$HTTP_CODE" -eq 201 ]; then
+          PIPELINE_ID=$(jq -r '.id' /tmp/response.json)
+          PIPELINE_URL=$(jq -r '.web_url' /tmp/response.json)
+
+          echo "✅ Deploy em produção disparado com sucesso!"
+          echo ""
+          echo "🔗 Links:"
+          echo "  - Tag: $CI_PROJECT_URL/-/tags/$PROD_VERSION"
+          echo "  - Pipeline Deploy: $PIPELINE_URL"
+        else
+          echo "❌ Erro ao disparar deploy (HTTP $HTTP_CODE)"
+          cat /tmp/response.json
+          echo ""
+          echo "⚠️  Tag foi criada, mas deploy não foi disparado"
+        fi
+      fi
+
+      echo ""
       echo "✅ Release $PROD_VERSION qualificada e publicada!"
       echo ""
-      echo "🔗 Tag: $CI_PROJECT_URL/-/tags/$PROD_VERSION"
-      echo ""
       echo "📝 Próximos passos:"
-      echo "  1. O pipeline de release será disparado automaticamente"
-      echo "  2. Artefatos serão publicados no GitLab Releases"
-      echo "  3. Deploy em produção será iniciado"
+      echo "  1. Aguarde o deploy completar no cloud-foundation"
+      echo "  2. Monitore logs e métricas em produção"
+      echo "  3. Comunique stakeholders sobre a release"
   rules:
     - if: '$CI_PIPELINE_SOURCE == "web" && $CI_COMMIT_REF_NAME == "main"'
       when: manual

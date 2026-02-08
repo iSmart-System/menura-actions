@@ -1,0 +1,103 @@
+# =============================================================================
+# Exemplo COMPLETO: CI + Preview Deploy + Release Management (Bun)
+# =============================================================================
+# Este exemplo mostra o fluxo completo de CI/CD com release management.
+# Copie este arquivo para a raiz do seu projeto como .gitlab-ci.yml
+# =============================================================================
+
+# Workflow rules: controla quando a pipeline é executada
+workflow:
+  rules:
+    # Permitir MRs (Merge Requests)
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    # Evitar duplicação se já existe MR aberto para a branch
+    - if: '$CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS'
+      when: never
+    # BLOQUEAR commits diretos em sandbox e main (usar workflow de release!)
+    - if: '$CI_COMMIT_BRANCH == "sandbox" || $CI_COMMIT_BRANCH == "main"'
+      when: never
+    # Permitir outras branches (feature, fix, etc.)
+    - if: '$CI_COMMIT_BRANCH'
+
+include:
+  # CI templates
+  - project: 'm3nura/pipelines'
+    ref: main
+    file:
+      - '.gitlab/ci/codebase-ci-bun.yml'
+      - '.gitlab/deploy/codebase-preview-deploy.yml'
+      - '.gitlab/release/create-rc-bun.yml'
+      - '.gitlab/release/qualify-rc-to-release.yml'
+
+# Definir stages
+stages:
+  - test      # Lint e testes
+  - build     # Build do código
+  - deploy    # Preview deploy em MRs
+  - release   # Release management (RC e produção)
+
+# Variáveis do projeto
+variables:
+  BUN_VERSION: "latest"
+  ARTIFACT_PATH: "dist"
+  ARTIFACT_NAME: "meu-app-bun"
+  PREVIEW_URL: "https://app.sandbox.menura.com.br"
+
+# =============================================================================
+# Jobs de CI (executam em MRs e feature branches)
+# =============================================================================
+
+lint:
+  extends: .bun-lint
+
+test:
+  extends: .bun-test
+
+build:
+  extends: .bun-build
+
+# =============================================================================
+# Preview Deploy (executam em MRs)
+# =============================================================================
+
+preview:
+  extends: .preview-deploy
+  needs:
+    - job: build
+      artifacts: true
+
+# =============================================================================
+# Release Management (executam MANUALMENTE via Web UI)
+# =============================================================================
+
+# 1. Create RC (executa APENAS na branch sandbox)
+create-rc:
+  extends: .create-rc-bun
+  stage: release
+  # Para executar:
+  # 1. Vá na pipeline da branch sandbox
+  # 2. Clique em "Run pipeline"
+  # 3. Adicione variable: RC_VERSION=1.0.0-rc.1
+  # 4. Execute o job "create-rc" manualmente
+  #
+  # O que acontece:
+  # - Build é executado
+  # - Artefato RC é gerado (meu-app-bun-v1.0.0-rc.1-abc123-1234567890.zip)
+  # - Tag v1.0.0-rc.1 é criada
+  # - Trigger é disparado para cloud-foundation fazer deploy em sandbox
+
+# 2. Qualify RC (executa APENAS na branch main)
+qualify-rc:
+  extends: .qualify-rc-to-release
+  stage: release
+  # Para executar:
+  # 1. Após RC validada, faça MR de sandbox → main
+  # 2. Após merge, vá na pipeline da branch main
+  # 3. Clique em "Run pipeline"
+  # 4. Adicione variable: RC_TAG=v1.0.0-rc.1
+  # 5. Execute o job "qualify-rc" manualmente
+  #
+  # O que acontece:
+  # - Tag de produção é criada (v1.0.0)
+  # - Tag RC antiga é removida (v1.0.0-rc.1)
+  # - Trigger é disparado para cloud-foundation fazer deploy em produção
