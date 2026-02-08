@@ -28,7 +28,9 @@
   extends: .bun-base
   stage: test
   script:
+    - echo "🔍 Lint - Verificando código (ESLint + Prettier)"
     - bun run lint
+    - echo "✅ Lint concluído com sucesso!"
   rules:
     - if: '$SKIP_LINT == "true"'
       when: never
@@ -39,7 +41,9 @@
   extends: .bun-base
   stage: test
   script:
+    - echo "🧪 Testes - Executando suite de testes"
     - bun test
+    - echo "✅ Testes concluídos com sucesso!"
   coverage: '/All files[^|]*\|[^|]*\s+([\d\.]+)/'
   artifacts:
     when: always
@@ -58,6 +62,8 @@
     - apk add --no-cache zip
   script:
     - |
+      echo "📋 Build - Validando configuração"
+
       # Validar variáveis obrigatórias ANTES do build
       if [ -z "$ARTIFACT_PATH" ]; then
         echo "❌ ARTIFACT_PATH não definido"
@@ -72,7 +78,11 @@
         echo "Exemplo: ARTIFACT_NAME: \"meu-app\""
         exit 1
       fi
+
+      echo "✅ Configuração validada"
+    - echo "🔨 Build - Compilando projeto"
     - bun run build
+    - echo "✅ Build concluído"
     - |
       # Criar zip do artefato com nome único
       BUILD_PATH="$ARTIFACT_PATH"

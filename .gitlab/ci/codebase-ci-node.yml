@@ -29,7 +29,9 @@
   extends: .node-base
   stage: test
   script:
+    - echo "🔍 Lint - Verificando código (ESLint + Prettier)"
     - npm run lint
+    - echo "✅ Lint concluído com sucesso!"
   rules:
     - if: '$SKIP_LINT == "true"'
       when: never
@@ -40,7 +42,9 @@
   extends: .node-base
   stage: test
   script:
+    - echo "🧪 Testes - Executando suite de testes"
     - npm test
+    - echo "✅ Testes concluídos com sucesso!"
   coverage: '/All files[^|]*\|[^|]*\s+([\d\.]+)/'
   artifacts:
     when: always
@@ -59,8 +63,14 @@
 .node-build:
   extends: .node-base
   stage: build
+  before_script:
+    # Instalar dependências do sistema (zip)
+    - apt-get update -qq && apt-get install -y -qq zip > /dev/null 2>&1 || apk add --no-cache zip > /dev/null 2>&1
+    - npm ci --cache .npm --prefer-offline
   script:
     - |
+      echo "📋 Build - Validando configuração"
+
       # Validar variáveis obrigatórias ANTES do build
       if [ -z "$ARTIFACT_PATH" ]; then
         echo "❌ ARTIFACT_PATH não definido"
@@ -75,7 +85,11 @@
         echo "Exemplo: ARTIFACT_NAME: \"meu-app\""
         exit 1
       fi
+
+      echo "✅ Configuração validada"
+    - echo "🔨 Build - Compilando projeto"
     - npm run build
+    - echo "✅ Build concluído"
     - |
       # Criar zip do artefato com nome único
       BUILD_PATH="$ARTIFACT_PATH"
