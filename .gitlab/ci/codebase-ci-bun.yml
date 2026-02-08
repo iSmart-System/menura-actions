@@ -28,9 +28,9 @@
   extends: .bun-base
   stage: test
   script:
-    - echo "🔍 Lint - Verificando código (ESLint + Prettier)"
+    - echo "🔍 Lint - Verificando código"
     - bun run lint
-    - echo "✅ Lint concluído com sucesso!"
+    - echo "✅ Lint concluído!"
   rules:
     - if: '$SKIP_LINT == "true"'
       when: never
@@ -41,9 +41,9 @@
   extends: .bun-base
   stage: test
   script:
-    - echo "🧪 Testes - Executando suite de testes"
+    - echo "🧪 Testes - Executando testes"
     - bun test
-    - echo "✅ Testes concluídos com sucesso!"
+    - echo "✅ Testes concluídos!"
   coverage: '/All files[^|]*\|[^|]*\s+([\d\.]+)/'
   artifacts:
     when: always

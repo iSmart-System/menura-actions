@@ -2,10 +2,11 @@
 # Create Release Candidate (Reusable Pipeline)
 # =============================================================================
 # Pipeline reutilizável para criar Release Candidates no ambiente sandbox.
+# Reusa o artefato do job build, cria tag e dispara deploy.
 # Execução manual via web UI, disponível apenas na branch sandbox.
 # =============================================================================
 
-.create-release-candidate:
+.create-rc:
   stage: release
   image: alpine:latest
   before_script:
@@ -17,7 +18,7 @@
       echo "🏷️  Criando Release Candidate"
       echo ""
 
-      # Validar versão
+      # Validar RC_VERSION
       if [ -z "$RC_VERSION" ]; then
         echo "❌ RC_VERSION não definida"
         echo ""
@@ -43,31 +44,98 @@
         exit 1
       fi
 
-      echo "📋 Criando Release Candidate:"
+      # Validar ARTIFACT_NAME (necessário para trigger)
+      if [ -z "$ARTIFACT_NAME" ]; then
+        echo "❌ ARTIFACT_NAME não definido"
+        echo "Configure: variables.ARTIFACT_NAME no seu .gitlab-ci.yml"
+        exit 1
+      fi
+
+      echo "📋 Release Candidate:"
       echo "  - Versão: v$RC_VERSION"
       echo "  - Branch: $CI_COMMIT_REF_NAME"
       echo "  - Commit: $CI_COMMIT_SHORT_SHA"
+      echo "  - Artefato: $ARTIFACT_NAME"
       echo ""
 
-      # Criar tag
+      # STEP 1: Verificar artefato do build
+      echo "📦 Verificando artefato do build..."
+
+      # Listar artefatos disponíveis
+      ZIP_FILE=$(ls *.zip 2>/dev/null | head -n 1)
+
+      if [ -z "$ZIP_FILE" ]; then
+        echo "❌ Nenhum artefato .zip encontrado"
+        echo "Certifique-se que o job build foi executado e gerou o artefato"
+        exit 1
+      fi
+
+      echo "✅ Artefato encontrado: $ZIP_FILE"
+      echo ""
+
+      # STEP 2: Criar tag RC
+      echo "🏷️  Criando tag Git v$RC_VERSION..."
+
       git tag -a "v$RC_VERSION" -m "Release Candidate $RC_VERSION
 
-Created from: $CI_COMMIT_REF_NAME
-Commit: $CI_COMMIT_SHA
-Pipeline: $CI_PIPELINE_URL
-Created by: $GITLAB_USER_LOGIN"
+      Created from: $CI_COMMIT_REF_NAME
+      Commit: $CI_COMMIT_SHA
+      Pipeline: $CI_PIPELINE_URL
+      Created by: $GITLAB_USER_LOGIN
+      Artifact: $ZIP_FILE"
 
-      # Push tag
       git push origin "v$RC_VERSION"
+      echo "✅ Tag v$RC_VERSION criada"
+      echo ""
+
+      # STEP 3: Trigger Cloud Foundation para deploy
+      echo "🚀 Disparando deploy no cloud-foundation..."
+
+      # Validar token
+      if [ -z "$CLOUD_FOUNDATION_TOKEN" ]; then
+        echo "⚠️  CLOUD_FOUNDATION_TOKEN não configurado"
+        echo "Deploy automático não será disparado"
+        echo "Configure no Group: Settings → CI/CD → Variables"
+      else
+        # Montar URL do artefato (job artifacts)
+        ARTIFACT_URL="$CI_PROJECT_URL/-/jobs/$CI_JOB_ID/artifacts/download"
+
+        HTTP_CODE=$(curl -w "%{http_code}" -o /tmp/response.json -X POST \
+          "https://gitlab.com/api/v4/projects/m3nura%2Fcloud-foundation/trigger/pipeline" \
+          -d "token=$CLOUD_FOUNDATION_TOKEN" \
+          -d "ref=main" \
+          -d "variables[TRIGGER_SOURCE]=rc-deploy" \
+          -d "variables[SOURCE_PROJECT]=$CI_PROJECT_PATH" \
+          -d "variables[RC_VERSION]=v$RC_VERSION" \
+          -d "variables[ARTIFACT_NAME]=$ZIP_FILE" \
+          -d "variables[ARTIFACT_URL]=$ARTIFACT_URL" \
+          -d "variables[ENVIRONMENT]=sandbox" \
+          -d "variables[GITLAB_USER]=$GITLAB_USER_LOGIN")
+
+        if [ "$HTTP_CODE" -eq 201 ]; then
+          PIPELINE_ID=$(jq -r '.id' /tmp/response.json)
+          PIPELINE_URL=$(jq -r '.web_url' /tmp/response.json)
+
+          echo "✅ Deploy disparado com sucesso!"
+          echo ""
+          echo "🔗 Links:"
+          echo "  - Tag: $CI_PROJECT_URL/-/tags/v$RC_VERSION"
+          echo "  - Pipeline Deploy: $PIPELINE_URL"
+        else
+          echo "❌ Erro ao disparar deploy (HTTP $HTTP_CODE)"
+          cat /tmp/response.json
+          echo ""
+          echo "⚠️  Tag e artefato foram criados, mas deploy não foi disparado"
+        fi
+      fi
 
       echo ""
       echo "✅ Release Candidate v$RC_VERSION criada com sucesso!"
       echo ""
-      echo "🔗 Tag: $CI_PROJECT_URL/-/tags/v$RC_VERSION"
-      echo ""
       echo "📝 Próximos passos:"
-      echo "  1. Valide a RC no ambiente sandbox"
-      echo "  2. Se aprovada, qualifique para produção (branch main)"
+      echo "  1. Aguarde o deploy completar no cloud-foundation"
+      echo "  2. Valide a RC no ambiente sandbox"
+      echo "  3. Se aprovada, qualifique para produção (branch main)"
   rules:
     - if: '$CI_PIPELINE_SOURCE == "web" && $CI_COMMIT_REF_NAME == "sandbox"'
       when: manual
@@ -75,4 +143,6 @@ Created by: $GITLAB_USER_LOGIN"
       when: manual
   only:
     - sandbox
-  needs: []
+  needs:
+    - job: build
+      artifacts: true

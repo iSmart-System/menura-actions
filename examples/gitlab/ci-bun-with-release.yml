@@ -26,7 +26,7 @@ include:
     file:
       - '.gitlab/ci/codebase-ci-bun.yml'
       - '.gitlab/deploy/codebase-preview-deploy.yml'
-      - '.gitlab/release/create-rc-bun.yml'
+      - '.gitlab/release/create-rc.yml'
       - '.gitlab/release/qualify-rc-to-release.yml'
 
 # Definir stages
@@ -72,7 +72,7 @@ preview:
 
 # 1. Create RC (executa APENAS na branch sandbox)
 create-rc:
-  extends: .create-rc-bun
+  extends: .create-rc
   stage: release
   # Para executar:
   # 1. Vá na pipeline da branch sandbox
@@ -81,8 +81,7 @@ create-rc:
   # 4. Execute o job "create-rc" manualmente
   #
   # O que acontece:
-  # - Build é executado
-  # - Artefato RC é gerado (meu-app-bun-v1.0.0-rc.1-abc123-1234567890.zip)
+  # - Reusa artefato do job build (já executado)
   # - Tag v1.0.0-rc.1 é criada
   # - Trigger é disparado para cloud-foundation fazer deploy em sandbox
 
